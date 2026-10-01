@@ -56,6 +56,10 @@ doc.getElementById('lvlfert').value = '10'; doc.getElementById('lvlfert').oninpu
 api.openMod('Jupiter');
 must(/Advanced Fertilizer.*?6\/min/.test(strip(els.busin.innerHTML)), 'fertilizer efficiency did not change fertilizer use: ' + strip(els.busin.innerHTML));
 doc.getElementById('lvlfert').value = '0'; doc.getElementById('lvlfert').oninput();
+// sales ability: one level is +25%, so brick's 70 becomes 87.5
+doc.getElementById('lvlsell').value = '1'; doc.getElementById('lvlsell').oninput();
+must(/87\.5/.test(strip(els.rows.innerHTML)), 'sales ability did not raise prices by 25%');
+doc.getElementById('lvlsell').value = '0'; doc.getElementById('lvlsell').oninput();
 
 if (process.argv.includes('--fragment')) {
   fs.mkdirSync(path.join(root, 'dist'), { recursive: true });

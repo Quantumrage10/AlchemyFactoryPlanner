@@ -5,16 +5,17 @@ function makeCore(DATA){
   // Upgrades. Belt speed and machine speed follow the same steps the game uses:
   // belts +15/min per Logistics level up to 12, then +3; machines +25% per Factory Efficiency level up to 12, then +5%.
   let BELT=60, SPEED=1;
-  // Alchemy Skill raises the yield of extractors and alembics: +6% for levels 1-2, +8% for 3-8, +10% from 9.
-  // Fertilizer Efficiency makes each fertilizer feed 10% more per level. Retail Price adds 1% to shop prices per level.
+  // Steps per level, as the game's upgrade screen shows them:
+  // Alchemy Skill +10% extractor and alembic output; Fertilizer Efficiency +10%; Fuel Efficiency +10%;
+  // Sales Ability +25% shop price up to level 12, then +10%.
   let ALCH=1, FERTM=1, SELLM=1;
   const YIELD_MACHINES=['Extractor','Thermal Extractor','Alembic','Advanced Alembic'];
   const yieldOf=r=>YIELD_MACHINES.includes(r.machine)?ALCH:1;
   function setUpgrades(beltLvl,speedLvl,alchLvl,fertLvl,sellLvl){
     const lv=x=>Math.max(0,Math.floor(x||0)); const b=lv(beltLvl), f=lv(speedLvl), a=lv(alchLvl), ft=lv(fertLvl), sl=lv(sellLvl);
     BELT=60+Math.min(b,12)*15+Math.max(0,b-12)*3; SPEED=1+Math.min(f,12)*0.25+Math.max(0,f-12)*0.05;
-    let pct=0; for(let k=1;k<=a;k++) pct+= k<=2?6:(k<=8?8:10); ALCH=1+pct/100;
-    FERTM=1+ft*0.10; SELLM=1+sl*0.01;
+    ALCH=1+a*0.10;
+    FERTM=1+ft*0.10; SELLM=1+Math.min(sl,12)*0.25+Math.max(0,sl-12)*0.10;
     return {belt:BELT,speed:SPEED,alch:ALCH,fert:FERTM,sell:SELLM}; }
   const belt=()=>BELT, speed=()=>SPEED, sellMult=()=>SELLM, fertValue=()=>FERT_VALUE*FERTM;
   const isLiq=n=>!!(I[n]&&I[n].liq);

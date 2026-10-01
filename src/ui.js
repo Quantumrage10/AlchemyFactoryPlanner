@@ -40,7 +40,7 @@ function applyUpgrades(){ const v=id=>+$(id).value||0; const u=C.setUpgrades(v("
   const pct=x=>Math.round(x*100)+"%";
   $("upnote").textContent="Belts carry "+fmt(u.belt)+"/min. Machines run at "+pct(u.speed)+" speed. Extractors and alembics yield "+pct(u.alch)+". Fertilizer feeds "+pct(u.fert)+" as much. Shop prices are "+pct(u.sell)+".";
   $("connnote").textContent="each carries "+fmt(2*u.belt)+"/min (two belts)"; return u; }
-const price=n=>Math.round((I[n].sell||0)*C.sellMult());
+const price=n=>Math.round((I[n].sell||0)*C.sellMult()*10)/10;
 const baseUpgrades=()=>C.belt()===60&&C.speed()===1;
 function line(){ const k=tierMax()+"|"+cap()+"|"+C.belt()+"|"+C.speed()+"|"+C.yieldOf({machine:"Extractor"})+"|"+C.fertValue(); if(k!==lineKey){ LINE=C.busLine(tierMax(),cap()); lineKey=k; } return LINE; }
 // Where an item stands. code: ded (own wagon type), mix (shared research wagon), maybe, no
