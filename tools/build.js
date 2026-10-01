@@ -23,7 +23,7 @@ const mk = id => ({ id, value: '', innerHTML: '', textContent: '', hidden: false
   setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k]; },
   addEventListener() {}, appendChild(c) { this.children.push(c); }, closest() { return null; } });
 const doc = { getElementById: id => els[id] || (els[id] = mk(id)), createElement: () => mk('_'), querySelectorAll: () => [] };
-const init = { fe: '0', mL: '14', mW: '14', mH: '15', connmax: '8', lvlbelt: '0', lvlspeed: '14' };
+const init = { fe: '0', mL: '14', mW: '14', mH: '15', connmax: '8', lvlbelt: '0', lvlspeed: '14', lvlalch: '0', lvlfert: '0', lvlsell: '0' };
 for (const k in init) doc.getElementById(k).value = init[k];
 const store = {};
 const ls = { getItem: k => store[k] || null, setItem: (k, v) => { store[k] = v; } };
@@ -51,6 +51,11 @@ must(/Kiln\s+(HEAT\s+)?Glass\s+15\/min/.test(strip(els.mrows.innerHTML)), 'facto
 must(/90\/min/.test(els.upnote.textContent), 'belt upgrade did not change belt speed');
 doc.getElementById('lvlbelt').value = '0'; doc.getElementById('lvlspeed').value = '0';
 doc.getElementById('lvlspeed').oninput();
+// fertilizer efficiency: 10 levels doubles how far fertilizer goes, so Jupiter's 12/min halves
+doc.getElementById('lvlfert').value = '10'; doc.getElementById('lvlfert').oninput();
+api.openMod('Jupiter');
+must(/Advanced Fertilizer.*?6\/min/.test(strip(els.busin.innerHTML)), 'fertilizer efficiency did not change fertilizer use: ' + strip(els.busin.innerHTML));
+doc.getElementById('lvlfert').value = '0'; doc.getElementById('lvlfert').oninput();
 
 if (process.argv.includes('--fragment')) {
   fs.mkdirSync(path.join(root, 'dist'), { recursive: true });

@@ -5,13 +5,22 @@ function makeCore(DATA){
   // Upgrades. Belt speed and machine speed follow the same steps the game uses:
   // belts +15/min per Logistics level up to 12, then +3; machines +25% per Factory Efficiency level up to 12, then +5%.
   let BELT=60, SPEED=1;
-  function setUpgrades(beltLvl,speedLvl){ const b=Math.max(0,Math.floor(beltLvl||0)), f=Math.max(0,Math.floor(speedLvl||0));
-    BELT=60+Math.min(b,12)*15+Math.max(0,b-12)*3; SPEED=1+Math.min(f,12)*0.25+Math.max(0,f-12)*0.05; return {belt:BELT,speed:SPEED}; }
-  const belt=()=>BELT, speed=()=>SPEED;
+  // Alchemy Skill raises the yield of extractors and alembics: +6% for levels 1-2, +8% for 3-8, +10% from 9.
+  // Fertilizer Efficiency makes each fertilizer feed 10% more per level. Retail Price adds 1% to shop prices per level.
+  let ALCH=1, FERTM=1, SELLM=1;
+  const YIELD_MACHINES=['Extractor','Thermal Extractor','Alembic','Advanced Alembic'];
+  const yieldOf=r=>YIELD_MACHINES.includes(r.machine)?ALCH:1;
+  function setUpgrades(beltLvl,speedLvl,alchLvl,fertLvl,sellLvl){
+    const lv=x=>Math.max(0,Math.floor(x||0)); const b=lv(beltLvl), f=lv(speedLvl), a=lv(alchLvl), ft=lv(fertLvl), sl=lv(sellLvl);
+    BELT=60+Math.min(b,12)*15+Math.max(0,b-12)*3; SPEED=1+Math.min(f,12)*0.25+Math.max(0,f-12)*0.05;
+    let pct=0; for(let k=1;k<=a;k++) pct+= k<=2?6:(k<=8?8:10); ALCH=1+pct/100;
+    FERTM=1+ft*0.10; SELLM=1+sl*0.01;
+    return {belt:BELT,speed:SPEED,alch:ALCH,fert:FERTM,sell:SELLM}; }
+  const belt=()=>BELT, speed=()=>SPEED, sellMult=()=>SELLM, fertValue=()=>FERT_VALUE*FERTM;
   const isLiq=n=>!!(I[n]&&I[n].liq);
   const kind=n=>I[n]?I[n].kind:'none';
   // items per minute of `item` from ONE machine. Every machine is capped at one belt of output.
-  function rate(r,item){ let per=60/r.t*r.outs[item]*SPEED, capped=false;
+  function rate(r,item){ let per=60/r.t*r.outs[item]*yieldOf(r)*SPEED, capped=false;
     if(!isLiq(item)){ let cap=BELT; if(r.shared) cap/=r.shared; if(per>cap+1e-9){ per=cap; capped=true; } }
     return {per,capped}; }
   // cuts: Set of item names taken off the bus instead of made in this module
@@ -25,10 +34,10 @@ function makeCore(DATA){
         flows[n]=(flows[n]||0)+q;
         if(kind(n)==='raw'){ coins[n]=(coins[n]||0)+q; return; }
         const share=(byp[n]||0)*(q/(flows[n]||q)); const net=Math.max(0,q-share);
-        const machines=net/rate(r,n).per, crafts=net/r.outs[n];
+        const y=yieldOf(r); const machines=net/rate(r,n).per, crafts=net/(r.outs[n]*y);
         mach[n]=(mach[n]||0)+machines;
-        if(r.nut) fert+=crafts*r.nut/FERT_VALUE;
-        for(const o in r.outs) if(o!==n) nb[o]=(nb[o]||0)+crafts*r.outs[o];
+        if(r.nut) fert+=crafts*r.nut/(FERT_VALUE*FERTM);
+        for(const o in r.outs) if(o!==n) nb[o]=(nb[o]||0)+crafts*r.outs[o]*y;
         for(const i in r.ins) expand(i,crafts*r.ins[i],d+1);
       };
       expand(root,outRate,0);
@@ -79,6 +88,6 @@ function makeCore(DATA){
     for(const k in forcedBy) forcedBy[k]=[...new Set(forcedBy[k])];
     return {bus:B,forcedBy};
   }
-  return {I,R,M,LO,HI,UNIVERSAL,isLiq,kind,rate,solve,volume,fuelPerMin,cleanRate,busLine,simpleFrom,setUpgrades,belt,speed};
+  return {I,R,M,LO,HI,UNIVERSAL,isLiq,kind,rate,solve,volume,fuelPerMin,cleanRate,busLine,simpleFrom,setUpgrades,belt,speed,sellMult,fertValue,yieldOf};
 }
 if(typeof module!=='undefined') module.exports={makeCore};

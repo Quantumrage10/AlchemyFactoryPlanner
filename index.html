@@ -170,6 +170,12 @@ tr.itemhead th{white-space:nowrap}
       <label class="inl" for="lvlbelt">Logistics (belt speed) level <input type="number" autocomplete="off" id="lvlbelt" min="0" step="1" value="0" style="width:60px"></label>
       <label class="inl" for="lvlspeed">Factory Efficiency level <input type="number" autocomplete="off" id="lvlspeed" min="0" step="1" value="0" style="width:60px"></label>
       <label class="inl" for="fe">Fuel Efficiency level <input type="number" autocomplete="off" id="fe" min="0" step="1" value="0" style="width:60px"></label>
+      <label class="inl" for="lvlalch">Alchemy Skill level <input type="number" autocomplete="off" id="lvlalch" min="0" step="1" value="0" style="width:60px"></label>
+      <label class="inl" for="lvlfert">Fertilizer Efficiency level <input type="number" autocomplete="off" id="lvlfert" min="0" step="1" value="0" style="width:60px"></label>
+      <label class="inl" for="lvlsell">Retail Price level <input type="number" autocomplete="off" id="lvlsell" min="0" step="1" value="0" style="width:60px"></label>
+    </div>
+    <div class="controls">
+      <b class="grp"></b>
       <small class="mut" id="upnote"></small>
     </div>
     <div class="controls">
@@ -263,7 +269,7 @@ tr.itemhead th{white-space:nowrap}
         </table></div>
         <div class="mut" id="mtot"></div>
         <div id="notes"></div>
-        <p class="foot">Fuel is coke powder at 660 heat each, plus 10% per Fuel Efficiency level. Faster machines burn fuel faster, so fuel per item stays the same. Nurseries run on advanced fertilizer. A byproduct the module reuses (like the Athanor's charcoal) is taken off the machine counts first.</p>
+        <p class="foot">Fuel is coke powder at 660 heat each, plus 10% per Fuel Efficiency level. Faster machines burn fuel faster, so fuel per item stays the same. Nurseries run on advanced fertilizer, which goes further with Fertilizer Efficiency. Alchemy Skill raises what extractors and alembics give. A byproduct the module reuses (like the Athanor's charcoal) is taken off the machine counts first.</p>
       </div>
     </div>
   </section>
@@ -286,13 +292,22 @@ function makeCore(DATA){
   // Upgrades. Belt speed and machine speed follow the same steps the game uses:
   // belts +15/min per Logistics level up to 12, then +3; machines +25% per Factory Efficiency level up to 12, then +5%.
   let BELT=60, SPEED=1;
-  function setUpgrades(beltLvl,speedLvl){ const b=Math.max(0,Math.floor(beltLvl||0)), f=Math.max(0,Math.floor(speedLvl||0));
-    BELT=60+Math.min(b,12)*15+Math.max(0,b-12)*3; SPEED=1+Math.min(f,12)*0.25+Math.max(0,f-12)*0.05; return {belt:BELT,speed:SPEED}; }
-  const belt=()=>BELT, speed=()=>SPEED;
+  // Alchemy Skill raises the yield of extractors and alembics: +6% for levels 1-2, +8% for 3-8, +10% from 9.
+  // Fertilizer Efficiency makes each fertilizer feed 10% more per level. Retail Price adds 1% to shop prices per level.
+  let ALCH=1, FERTM=1, SELLM=1;
+  const YIELD_MACHINES=['Extractor','Thermal Extractor','Alembic','Advanced Alembic'];
+  const yieldOf=r=>YIELD_MACHINES.includes(r.machine)?ALCH:1;
+  function setUpgrades(beltLvl,speedLvl,alchLvl,fertLvl,sellLvl){
+    const lv=x=>Math.max(0,Math.floor(x||0)); const b=lv(beltLvl), f=lv(speedLvl), a=lv(alchLvl), ft=lv(fertLvl), sl=lv(sellLvl);
+    BELT=60+Math.min(b,12)*15+Math.max(0,b-12)*3; SPEED=1+Math.min(f,12)*0.25+Math.max(0,f-12)*0.05;
+    let pct=0; for(let k=1;k<=a;k++) pct+= k<=2?6:(k<=8?8:10); ALCH=1+pct/100;
+    FERTM=1+ft*0.10; SELLM=1+sl*0.01;
+    return {belt:BELT,speed:SPEED,alch:ALCH,fert:FERTM,sell:SELLM}; }
+  const belt=()=>BELT, speed=()=>SPEED, sellMult=()=>SELLM, fertValue=()=>FERT_VALUE*FERTM;
   const isLiq=n=>!!(I[n]&&I[n].liq);
   const kind=n=>I[n]?I[n].kind:'none';
   // items per minute of `item` from ONE machine. Every machine is capped at one belt of output.
-  function rate(r,item){ let per=60/r.t*r.outs[item]*SPEED, capped=false;
+  function rate(r,item){ let per=60/r.t*r.outs[item]*yieldOf(r)*SPEED, capped=false;
     if(!isLiq(item)){ let cap=BELT; if(r.shared) cap/=r.shared; if(per>cap+1e-9){ per=cap; capped=true; } }
     return {per,capped}; }
   // cuts: Set of item names taken off the bus instead of made in this module
@@ -306,10 +321,10 @@ function makeCore(DATA){
         flows[n]=(flows[n]||0)+q;
         if(kind(n)==='raw'){ coins[n]=(coins[n]||0)+q; return; }
         const share=(byp[n]||0)*(q/(flows[n]||q)); const net=Math.max(0,q-share);
-        const machines=net/rate(r,n).per, crafts=net/r.outs[n];
+        const y=yieldOf(r); const machines=net/rate(r,n).per, crafts=net/(r.outs[n]*y);
         mach[n]=(mach[n]||0)+machines;
-        if(r.nut) fert+=crafts*r.nut/FERT_VALUE;
-        for(const o in r.outs) if(o!==n) nb[o]=(nb[o]||0)+crafts*r.outs[o];
+        if(r.nut) fert+=crafts*r.nut/(FERT_VALUE*FERTM);
+        for(const o in r.outs) if(o!==n) nb[o]=(nb[o]||0)+crafts*r.outs[o]*y;
         for(const i in r.ins) expand(i,crafts*r.ins[i],d+1);
       };
       expand(root,outRate,0);
@@ -360,7 +375,7 @@ function makeCore(DATA){
     for(const k in forcedBy) forcedBy[k]=[...new Set(forcedBy[k])];
     return {bus:B,forcedBy};
   }
-  return {I,R,M,LO,HI,UNIVERSAL,isLiq,kind,rate,solve,volume,fuelPerMin,cleanRate,busLine,simpleFrom,setUpgrades,belt,speed};
+  return {I,R,M,LO,HI,UNIVERSAL,isLiq,kind,rate,solve,volume,fuelPerMin,cleanRate,busLine,simpleFrom,setUpgrades,belt,speed,sellMult,fertValue,yieldOf};
 }
 
 // Page logic. Expects DATA and makeCore() to be defined above it.
@@ -378,10 +393,10 @@ const maxTier=Math.max(...Object.values(I).map(i=>i.tier));
 for(let t=1;t<=maxTier;t++){ const o=document.createElement("option"); o.value=t; o.textContent=t; $("tier").appendChild(o); }
 $("tier").value=maxTier;
 // your settings are remembered in this browser
-const SET_IDS=["tier","fe","mL","mW","mH","connmax","lvlbelt","lvlspeed"];
+const SET_IDS=["tier","fe","mL","mW","mH","connmax","lvlbelt","lvlspeed","lvlalch","lvlfert","lvlsell"];
 // Set every setting explicitly: the saved value if there is one, otherwise the default.
 // (Browsers refill form fields by position after a reload, which put old values in the wrong boxes.)
-const SET_DEFAULT={tier:maxTier,fe:0,mL:14,mW:14,mH:15,connmax:8,lvlbelt:0,lvlspeed:0};
+const SET_DEFAULT={tier:maxTier,fe:0,mL:14,mW:14,mH:15,connmax:8,lvlbelt:0,lvlspeed:0,lvlalch:0,lvlfert:0,lvlsell:0};
 { let sv={}; try{ sv=JSON.parse(localStorage.getItem("bsp_settings_v2")||"{}")||{}; }catch(e){ sv={}; }
   for(const id of SET_IDS){ const v=+sv[id]; const ok=sv[id]!=null&&sv[id]!==""&&isFinite(v)&&v>=0&&(id!=="tier"||(v>=1&&v<=maxTier)); $(id).value=ok?sv[id]:SET_DEFAULT[id]; } }
 const saveSettings=()=>{ try{ const o={}; for(const id of SET_IDS) o[id]=$(id).value; localStorage.setItem("bsp_settings_v2",JSON.stringify(o)); }catch(e){} };
@@ -401,10 +416,13 @@ function decide(item,to){ if(to===null) delete choice[item]; else choice[item]=t
 // ---------- the bus line for the current tier and tile size ----------
 let LINE=null, lineKey="";
 // upgrades change belt speed and machine speed everywhere
-function applyUpgrades(){ const u=C.setUpgrades(+$("lvlbelt").value||0,+$("lvlspeed").value||0);
-  $("upnote").textContent="Belts carry "+fmt(u.belt)+"/min. Machines run at "+Math.round(u.speed*100)+"% speed."; $("connnote").textContent="each carries "+fmt(2*u.belt)+"/min (two belts)"; return u; }
+function applyUpgrades(){ const v=id=>+$(id).value||0; const u=C.setUpgrades(v("lvlbelt"),v("lvlspeed"),v("lvlalch"),v("lvlfert"),v("lvlsell"));
+  const pct=x=>Math.round(x*100)+"%";
+  $("upnote").textContent="Belts carry "+fmt(u.belt)+"/min. Machines run at "+pct(u.speed)+" speed. Extractors and alembics yield "+pct(u.alch)+". Fertilizer feeds "+pct(u.fert)+" as much. Shop prices are "+pct(u.sell)+".";
+  $("connnote").textContent="each carries "+fmt(2*u.belt)+"/min (two belts)"; return u; }
+const price=n=>Math.round((I[n].sell||0)*C.sellMult());
 const baseUpgrades=()=>C.belt()===60&&C.speed()===1;
-function line(){ const k=tierMax()+"|"+cap()+"|"+C.belt()+"|"+C.speed(); if(k!==lineKey){ LINE=C.busLine(tierMax(),cap()); lineKey=k; } return LINE; }
+function line(){ const k=tierMax()+"|"+cap()+"|"+C.belt()+"|"+C.speed()+"|"+C.yieldOf({machine:"Extractor"})+"|"+C.fertValue(); if(k!==lineKey){ LINE=C.busLine(tierMax(),cap()); lineKey=k; } return LINE; }
 // Where an item stands. code: ded (own wagon type), mix (shared research wagon), maybe, no
 function status(n){
   const it=I[n], L=line(); const users=it.uses.filter(inTier); const made=it.kind==="made"&&!it.liq;
@@ -461,7 +479,7 @@ function renderItems(){
       else if(r.st.code==="ded"||r.st.code==="mix") act=`<button class="swap" data-item="${esc(r.n)}" data-to="off">Keep it off the bus</button>`;
       else act=`<button class="swap" data-item="${esc(r.n)}" data-to="bus">Put it on the bus</button>`;
     }
-    return `<tr><td class="nmc">${name}</td><td class="stc"><span class="st ${r.st.code}">${SLABEL[r.st.code]}</span>${r.st.mine?'<div class="mine">your choice</div>':""}</td><td class="why">${esc(r.st.why)}</td><td class="act">${act}</td><td class="usedc"><div class="chips">${used}</div></td><td class="num">${r.it.sell?r.it.sell.toLocaleString():""}</td><td class="num">${r.it.tier}</td></tr>`; }).join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
+    return `<tr><td class="nmc">${name}</td><td class="stc"><span class="st ${r.st.code}">${SLABEL[r.st.code]}</span>${r.st.mine?'<div class="mine">your choice</div>':""}</td><td class="why">${esc(r.st.why)}</td><td class="act">${act}</td><td class="usedc"><div class="chips">${used}</div></td><td class="num">${r.it.sell?price(r.n).toLocaleString():""}</td><td class="num">${r.it.tier}</td></tr>`; }).join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
 }
 $("q").oninput=renderItems;
 $("rows").addEventListener("click",e=>{ const s=e.target.closest(".swap"); if(s){ decide(s.dataset.item,s.dataset.to||null); return; } const b=e.target.closest("[data-mod]"); if(b) openMod(b.dataset.mod); });
@@ -506,7 +524,7 @@ function renderMod(){
   $("mname").textContent=root;
   const it=I[root], st=status(root); const users=it.uses.filter(inTier);
   const ends=[...users, it.relic?"research":"", it.sell?"the shop":""].filter(Boolean);
-  $("mmeta").innerHTML=`Tech tier ${it.tier}`+(it.sell?` · sells for ${it.sell.toLocaleString()}`:"")+(ends.length?` · goes to ${esc(listAnd(ends))}`:" · nothing at this tier uses it")+` · on the bus: <b class="${st.code==="no"?"":"cu"}">${SLABEL[st.code].toLowerCase()}</b>`;
+  $("mmeta").innerHTML=`Tech tier ${it.tier}`+(it.sell?` · sells for ${price(root).toLocaleString()}`:"")+(ends.length?` · goes to ${esc(listAnd(ends))}`:" · nothing at this tier uses it")+` · on the bus: <b class="${st.code==="no"?"":"cu"}">${SLABEL[st.code].toLowerCase()}</b>`;
 
   // --- fit ---
   const block=C.cleanRate(root,cs), step=C.rate(R[root],root).per, cp=cap();
@@ -607,9 +625,9 @@ $("ingr").addEventListener("click",e=>{ const b=e.target.closest(".swap"); if(b)
 function renderRates(){
   const q=$("rq").value.trim().toLowerCase(); const seen=new Set(); const rows=[];
   for(const n of Object.keys(I).sort((a,b)=>I[a].tier-I[b].tier||a.localeCompare(b))){ const r=R[n]; if(!r||I[n].kind==="raw"||seen.has(r.id)||!inTier(n)) continue; seen.add(r.id);
-    const main=Object.keys(r.outs)[0]; const x=C.rate(r,main); const crafts=x.per/r.outs[main];
-    const ins=Object.entries(r.ins).map(([k,v])=>fmt(v*crafts)+" "+k).join(" + ")||(I[n].kind==="crop"?fmt(crafts*r.nut/720)+" Advanced Fertilizer":"—");
-    const outs=Object.entries(r.outs).map(([k,v])=>fmt(v*crafts)+" "+k).join(" + ");
+    const main=Object.keys(r.outs)[0]; const x=C.rate(r,main); const y=C.yieldOf(r); const crafts=x.per/(r.outs[main]*y);
+    const ins=Object.entries(r.ins).map(([k,v])=>fmt(v*crafts)+" "+k).join(" + ")||(I[n].kind==="crop"?fmt(crafts*r.nut/C.fertValue())+" Advanced Fertilizer":"—");
+    const outs=Object.entries(r.outs).map(([k,v])=>fmt(v*y*crafts)+" "+k).join(" + ");
     const txt=(main+" "+r.machine+" "+ins).toLowerCase(); if(q&&!txt.includes(q)) continue;
     rows.push(`<tr><td class="name">${esc(main)}</td><td>${esc(r.machine)}</td><td>${esc(ins)}</td><td>${esc(outs)}</td><td class="num">${r.heat?fmt(r.heat):""}</td><td class="why">${x.capped?"Capped at one belt ("+fmt(C.belt())+"/min). The recipe alone would be faster.":""}</td><td class="num">${I[n].tier}</td></tr>`); }
   $("rrows").innerHTML=rows.join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
@@ -619,7 +637,7 @@ $("rq").oninput=renderRates;
 // ---------- redraw ----------
 function redrawAll(){ saveSettings(); applyUpgrades(); line(); if(cur&&!inTier(cur)) cur=modNames()[0]||null; { const ks=Object.keys(choice).filter(k=>I[k]); $("choices").hidden=!ks.length;
     $("choicelist").innerHTML=ks.map(k=>`<span class="chip pick">${esc(k)}: ${choice[k]==="bus"?"on the bus":"kept off the bus"} <button class="x" data-item="${esc(k)}" aria-label="Undo ${esc(k)}">×</button></span>`).join(""); } renderItems(); renderList(); renderMod(); renderRates(); }
-for(const id of ["tier","fe","connmax","lvlbelt","lvlspeed"]) $(id).oninput=redrawAll;
+for(const id of ["tier","fe","connmax","lvlbelt","lvlspeed","lvlalch","lvlfert","lvlsell"]) $(id).oninput=redrawAll;
 for(const d of ["mL","mW","mH"]){ const a=$(d), b=$(d+"2"); b.value=a.value; a.oninput=()=>{ b.value=a.value; redrawAll(); }; b.oninput=()=>{ a.value=b.value; redrawAll(); }; }
 $("tier").onchange=redrawAll;
 applyUpgrades(); line();
