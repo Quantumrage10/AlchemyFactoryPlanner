@@ -1,0 +1,11 @@
+{
+  "name": "alchemy-factory-bus-split-planner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Works out what goes on the wagon bus in Alchemy Factory, what each module needs, and whether it fits in one tile.",
+  "scripts": {
+    "fetch-data": "node tools/fetch-data.js",
+    "data": "node tools/gen-data.js",
+    "build": "node tools/build.js"
+  }
+}

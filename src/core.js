@@ -1,0 +1,78 @@
+// Pure calculation core. No DOM. Used by the page and by the node regression test.
+function makeCore(DATA){
+  const I=DATA.items, R=DATA.recipes, M=DATA.machines;
+  const BELT=60, FUEL_HEAT=660, FERT_VALUE=720, LO=2.4, HI=2.8;
+  const isLiq=n=>!!(I[n]&&I[n].liq);
+  const kind=n=>I[n]?I[n].kind:'none';
+  // items per minute of `item` from ONE machine. Every machine is capped at one belt of output.
+  function rate(r,item){ let per=60/r.t*r.outs[item], capped=false;
+    if(!isLiq(item)){ let belt=BELT; if(r.shared) belt/=r.shared; if(per>belt+1e-9){ per=belt; capped=true; } }
+    return {per,capped}; }
+  // cuts: Set of item names taken off the bus instead of made in this module
+  function solve(root,outRate,cuts){
+    let byp={}, res=null;
+    for(let it=0;it<80;it++){
+      const mach={}, busIn={}, coins={}, flows={}, nb={}; let fert=0;
+      const expand=(n,q,d)=>{ if(d>60) return;
+        if(n!==root && cuts.has(n)){ busIn[n]=(busIn[n]||0)+q; return; }
+        const r=R[n]; if(!r){ busIn[n]=(busIn[n]||0)+q; return; }
+        flows[n]=(flows[n]||0)+q;
+        if(kind(n)==='raw'){ coins[n]=(coins[n]||0)+q; return; }
+        const share=(byp[n]||0)*(q/(flows[n]||q)); const net=Math.max(0,q-share);
+        const machines=net/rate(r,n).per, crafts=net/r.outs[n];
+        mach[n]=(mach[n]||0)+machines;
+        if(r.nut) fert+=crafts*r.nut/FERT_VALUE;
+        for(const o in r.outs) if(o!==n) nb[o]=(nb[o]||0)+crafts*r.outs[o];
+        for(const i in r.ins) expand(i,crafts*r.ins[i],d+1);
+      };
+      expand(root,outRate,0);
+      const nbyp={}; for(const o in nb) if(flows[o]) nbyp[o]=Math.min(nb[o],flows[o]);
+      const spare={}; for(const o in nb){ const used=Math.min(nb[o],flows[o]||0); if(nb[o]-used>1e-9) spare[o]=nb[o]-used; }
+      res={mach,busIn,coins,fert,spare,flows,recycled:nbyp};
+      let diff=0; const keys=new Set([...Object.keys(nbyp),...Object.keys(byp)]); for(const k of keys) diff+=Math.abs((nbyp[k]||0)-(byp[k]||0));
+      byp=nbyp; if(diff<1e-9) break;
+    }
+    let hps=0; const list=[];
+    for(const n in res.mach){ const r=R[n], c=res.mach[n]; hps+=c*(r.heat||0);
+      list.push({item:n, machine:r.machine, out:Object.keys(r.outs).join(' + '), each:rate(r,n).per, capped:rate(r,n).capped, count:c, heat:(r.heat||0)>0}); }
+    list.sort((a,b)=>b.count-a.count);
+    let copper=0; for(const n in res.coins) copper+=res.coins[n]*(I[n].buy||0);
+    return {root,list,busIn:res.busIn,coins:res.coins,copper,fert:res.fert,spare:res.spare,flows:res.flows,recycled:res.recycled,hps};
+  }
+  function volume(sol,scale){ let v=0,furn=0,miss=false; const k=scale||1;
+    for(const m of sol.list){ const n=Math.ceil(m.count*k-1e-9); if(!n) continue; const d=M[m.machine];
+      if(!d||!d.v){ miss=true; v+=8*n; continue; } v+=d.v*n; if(d.slots) furn+=Math.ceil(n/Math.max(1,Math.floor(9/d.slots))); }
+    v+=furn*27; return {v,furn,miss}; }
+  function fuelPerMin(sol,fe){ return sol.hps*60/(FUEL_HEAT*(1+0.1*fe)); }
+  // smallest output where every machine count is whole (nurseries and single machines may round up)
+  function cleanRate(root,cuts){ const r=R[root]; const unit=rate(r,root).per; const s=solve(root,unit,cuts);
+    for(let k=1;k<=300;k++){ if(s.list.every(m=>{ const n=m.count*k; if(m.machine==='Nursery'||n<=1+1e-9) return true; return Math.abs(n-Math.round(n))<0.02; })) return unit*k; }
+    return unit; }
+  // The bus line. An item goes on the bus only when a module that needs it cannot fit making it inside one tile.
+  // When a module is too big, take off the bus whichever ingredient removes the most machinery per item moved; repeat.
+  const UNIVERSAL=['Coke Powder','Advanced Fertilizer'];
+  // A simple conversion: one unheated machine turning one ingredient into the same number of this item (steel ingot -> steel gear).
+  // Returns the ingredient's name, or null. These get converted on site; it's the ingredient that rides the bus.
+  function simpleFrom(n){ const r=R[n]; if(!r||!I[n]||I[n].kind!=='made'||I[n].liq||r.heat) return null;
+    const ins=Object.keys(r.ins).filter(k=>!isLiq(k)), outs=Object.keys(r.outs).filter(k=>!isLiq(k));
+    if(Object.keys(r.ins).length!==1||ins.length!==1||outs.length!==1) return null; const i=ins[0];
+    if(!I[i]||I[i].kind!=='made'||r.ins[i]!==r.outs[n]) return null; return i; }
+  function busLine(maxTier,cap){
+    const made=Object.keys(I).filter(n=>I[n].kind==='made'&&!I[n].liq&&I[n].tier<=maxTier).sort((a,b)=>I[a].tier-I[b].tier||a.localeCompare(b));
+    const B=new Set(UNIVERSAL), forcedBy={};
+    const fits=sol=>volume(sol).v*HI<=cap;
+    const plan=x=>{ const one=rate(R[x],x).per; const cuts=new Set(B); cuts.delete(x); let sol=solve(x,one,cuts), guard=0;
+      while(!fits(sol)&&guard++<15){ const v0=volume(sol).v; let best=null;
+        for(const c in sol.flows){ if(c===x||I[c].kind!=='made'||I[c].liq||cuts.has(c)) continue;
+          const t=new Set(cuts); t.add(c); const sc=solve(x,one,t); const flow=sc.busIn[c]||0; if(flow<=0) continue;
+          const gain=(v0-volume(sc).v)/flow; if(!best||gain>best.gain) best={c,gain,sc}; }
+        if(!best||best.gain<=0) break;
+        let c=best.c, src; while(!UNIVERSAL.includes(c)&&(src=simpleFrom(c))&&src!==x) c=src;
+        cuts.add(c); sol=(c===best.c)?best.sc:solve(x,one,cuts); B.add(c); (forcedBy[c]=forcedBy[c]||[]).push(x); } };
+    for(let pass=0;pass<4;pass++){ const before=B.size; for(const x of made) plan(x); if(pass>0&&B.size===before) break; }
+    for(const k in forcedBy) forcedBy[k]=[...new Set(forcedBy[k])];
+    return {bus:B,forcedBy};
+  }
+  return {I,R,M,BELT,LO,HI,UNIVERSAL,isLiq,kind,rate,solve,volume,fuelPerMin,cleanRate,busLine,simpleFrom};
+}
+if(typeof module!=='undefined') module.exports={makeCore};

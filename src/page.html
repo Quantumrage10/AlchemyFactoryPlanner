@@ -1,0 +1,112 @@
+<div class="wrap">
+  <header>
+    <h1>Bus Split Planner</h1>
+    <p class="sub">What goes on the bus, what each module needs, and whether it fits. Every number comes from the recipe data (<span id="ver"></span>) at base speeds, with every machine capped at one belt of output.</p>
+  </header>
+
+  <section class="rule" aria-label="Settings and the rule">
+    <div class="controls">
+      <label class="inl" for="tier">Show items up to tier <select id="tier"></select></label>
+      <span class="inl">Tile size <label for="mL" class="vh">Length</label><input type="number" id="mL" min="1" step="1" value="14" style="width:54px"> × <label for="mW" class="vh">Width</label><input type="number" id="mW" min="1" step="1" value="14" style="width:54px"> × <label for="mH" class="vh">Height</label><input type="number" id="mH" min="1" step="1" value="15" style="width:54px"> <small class="mut">L × W × H</small></span>
+      <label class="inl" for="fe">Fuel Efficiency level <input type="number" id="fe" min="0" step="1" value="0" style="width:60px"></label>
+      <label class="inl" for="connmax">Bus connections per tile <input type="number" id="connmax" min="1" step="1" value="8" style="width:56px"> <small class="mut">each carries 120/min (two belts)</small></label>
+    </div>
+    <div><b>How the bus line is drawn.</b> A module makes everything it needs inside its own tile, from coins, whenever that fits. Each item then lands in one of four places:</div>
+    <ul class="legendlist">
+      <li><span class="st ded">Yes · own wagons</span> A module that needs it can't fit making it, so it gets its own module and its own tagged wagons. Coke powder and advanced fertilizer are always here.</li>
+      <li><span class="st mix">Yes · shared wagon</span> Relics. They only go to the shop and to research, so they can all ride one "research" wagon type instead of one each.</li>
+      <li><span class="st maybe">Maybe</span> Packed-down items that only one or two things use. They fit inside the module that uses them, or you can give them their own module and bus them. Your call.</li>
+      <li><span class="st no">No</span> Bulk, raw, grown or liquid stuff, and things that are only sold. Made right where they're used, or next to the shop.</li>
+    </ul>
+    <div class="mut">Press "Put it on the bus" or "Keep it off the bus" on any item and every module that uses it updates to match.</div>
+  </section>
+
+  <div class="choices" id="choices" hidden>
+    <b>Your choices</b>
+    <span id="choicelist" class="chips"></span>
+    <button class="resetbtn" id="undoall">Reset all to defaults</button>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-items" aria-selected="true" aria-controls="pane-items">What goes on the bus</button>
+    <button class="tab" role="tab" id="tab-mods" aria-selected="false" aria-controls="pane-mods">Build a module</button>
+    <button class="tab" role="tab" id="tab-rates" aria-selected="false" aria-controls="pane-rates">Machine rates</button>
+  </div>
+
+  <section id="pane-items" role="tabpanel" aria-labelledby="tab-items" class="pane">
+    <div class="controls">
+      <input type="search" id="q" placeholder="Search an item…" aria-label="Search items">
+      <button class="pill yes" id="f-ded" aria-pressed="true">Yes · own wagons</button>
+      <button class="pill sold" id="f-mix" aria-pressed="true">Yes · shared wagon</button>
+      <button class="pill inside" id="f-maybe" aria-pressed="true">Maybe</button>
+      <button class="pill site" id="f-no" aria-pressed="true">No</button>
+      <span class="sep"></span>
+      <button class="pill sold" id="f-sold" aria-pressed="false">Only things I sell</button>
+      <button class="pill site" id="f-basic" aria-pressed="true">Hide raw, crops &amp; liquids</button>
+      <span class="mut" id="count"></span>
+    </div>
+    <div class="tablebox"><table class="items">
+      <thead><tr id="sorthead" class="itemhead">
+        <th><button class="sortb" data-k="item">Item</button></th>
+        <th><button class="sortb" data-k="bus">On the bus?</button></th>
+        <th><button class="sortb" data-k="why">Why</button></th>
+        <th>Your call</th>
+        <th><button class="sortb" data-k="used">Used by</button></th>
+        <th class="num"><button class="sortb" data-k="sell">Sells</button></th>
+        <th class="num"><button class="sortb" data-k="tier" title="The tier the item unlocks at, from the recipe data">Tier</button></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <p class="foot">Click an item's name to open its module. Every item that's made in a machine has one, whether it's on the bus or not.</p>
+  </section>
+
+  <section id="pane-mods" role="tabpanel" aria-labelledby="tab-mods" class="pane" hidden>
+    <div class="mods">
+      <div class="side">
+        <input type="search" id="mq" placeholder="Find a module…" aria-label="Find a module">
+        <nav class="modlist" id="modlist" aria-label="Modules"></nav>
+      </div>
+      <div class="detail">
+        <select class="modsel" id="modsel" aria-label="Choose module"></select>
+        <div class="dhead">
+          <div><h2 id="mname"></h2><div class="mut" id="mmeta"></div></div>
+          <div class="controls">
+            <label class="inl" for="rate">Output <input type="number" id="rate" min="0" step="any" style="width:96px"> /min</label>
+            <span class="inl">Tile size <label for="mL2" class="vh">Length</label><input type="number" id="mL2" min="1" step="1" style="width:54px" title="Length"> × <label for="mW2" class="vh">Width</label><input type="number" id="mW2" min="1" step="1" style="width:54px" title="Width"> × <label for="mH2" class="vh">Height</label><input type="number" id="mH2" min="1" step="1" style="width:54px" title="Height"> <small class="mut">L × W × H</small></span>
+          </div>
+        </div>
+        <div id="fit"></div>
+        <div class="io">
+          <div class="box"><h3>Comes off the bus</h3><div id="busin"></div></div>
+          <div class="box"><h3>Coins buy</h3><div id="coins"></div></div>
+          <div class="box"><h3>Comes out</h3><div id="outp"></div></div>
+          <div class="box"><h3>Bus connections used</h3><div id="conn"></div></div>
+        </div>
+        <div class="box">
+          <div class="dhead"><h3>Every ingredient, and where it comes from</h3></div>
+          <div class="tablebox inner"><table class="ingt">
+            <thead><tr><th>Ingredient</th><th class="num">Needed</th><th>Where it comes from</th><th></th></tr></thead>
+            <tbody id="ingr"></tbody>
+          </table></div>
+          <p class="fitsub">Put any ingredient on the bus, or keep it off, to see what it does to the size, the machines and what the bus has to carry. The choice applies to every module that uses that ingredient. Anything under an off-the-bus ingredient disappears from this module, because another module makes it.</p>
+        </div>
+        <div class="tablebox"><table>
+          <thead><tr><th>Machine</th><th>Makes</th><th class="num">One machine makes</th><th class="num">Exact</th><th class="num">Build</th><th class="num">Busy</th></tr></thead>
+          <tbody id="mrows"></tbody>
+        </table></div>
+        <div class="mut" id="mtot"></div>
+        <div id="notes"></div>
+        <p class="foot">Fuel is coke powder at 660 heat each, plus 10% per Fuel Efficiency level. Nurseries run on advanced fertilizer. A byproduct the module reuses (like the Athanor's charcoal) is taken off the machine counts first.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="pane-rates" role="tabpanel" aria-labelledby="tab-rates" class="pane" hidden>
+    <div class="controls"><input type="search" id="rq" placeholder="Search a recipe or machine…" aria-label="Search recipes"></div>
+    <div class="tablebox"><table class="items">
+      <thead><tr><th>Makes</th><th>Machine</th><th>One machine takes, per minute</th><th>One machine makes, per minute</th><th class="num">Heat /s</th><th>Note</th><th class="num">Tier</th></tr></thead>
+      <tbody id="rrows"></tbody>
+    </table></div>
+    <p class="foot">These are the numbers everything else on this page is built from. If one doesn't match what the machine shows in your game at base speed, that's the one that's wrong.</p>
+  </section>
+</div>

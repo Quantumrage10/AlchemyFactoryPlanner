@@ -1,0 +1,4 @@
+# third-party recipe database, downloaded by tools/fetch-data.js
+data/
+dist/
+node_modules/

@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bus Split Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&display=swap">
+<style>
+body{margin:0}
+[hidden]{display:none!important}
+:root{
+  --ground:#EEF2F0; --surface:#FFFFFF; --ink:#15201C; --muted:#5A6A64; --line:#D3DCD8;
+  --verd:#2B7664; --verd-soft:#DCEDE8; --copper:#A95A22; --copper-soft:#F6E4D6;
+  --slate:#6B7A86; --slate-soft:#E6EAEE; --gold:#8A6A12; --gold-soft:#F3EACB; --pipe:#3D6E93; --pipe-soft:#DDE8F1;
+  --focus:#2B7664;
+  --sans:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  color-scheme:dark; --ground:#0E1412; --surface:#16201C; --ink:#E3ECE8; --muted:#94A69F; --line:#28352F;
+  --verd:#62C1A9; --verd-soft:#1B3530; --copper:#E3945C; --copper-soft:#3A2618;
+  --slate:#9FB0BC; --slate-soft:#232C33; --gold:#D8B64E; --gold-soft:#342C12; --pipe:#86B6DA; --pipe-soft:#1B2A36; --focus:#62C1A9;}}
+:root[data-theme="dark"]{
+  color-scheme:dark; --ground:#0E1412; --surface:#16201C; --ink:#E3ECE8; --muted:#94A69F; --line:#28352F;
+  --verd:#62C1A9; --verd-soft:#1B3530; --copper:#E3945C; --copper-soft:#3A2618;
+  --slate:#9FB0BC; --slate-soft:#232C33; --gold:#D8B64E; --gold-soft:#342C12; --pipe:#86B6DA; --pipe-soft:#1B2A36; --focus:#62C1A9;}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.45;padding-inline:20px;padding-block:24px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-size:30px;font-weight:700;letter-spacing:-.01em;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;max-width:70ch}
+.rule{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:grid;gap:10px}
+.rule b{font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
+.pill.bus{background:var(--copper-soft);color:var(--copper);border-color:color-mix(in srgb,var(--copper) 35%,transparent)}
+.pill.inside{background:var(--verd-soft);color:var(--verd);border-color:color-mix(in srgb,var(--verd) 35%,transparent)}
+.pill.site{background:var(--slate-soft);color:var(--slate)}
+.pill.end{background:var(--gold-soft);color:var(--gold);border-color:color-mix(in srgb,var(--gold) 35%,transparent)}
+.pill.pipe{background:var(--pipe-soft);color:var(--pipe)}
+button.pill{cursor:pointer;font-family:inherit}
+button.pill[aria-pressed="false"]{opacity:.45}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tab{font:inherit;font-weight:600;font-size:15px;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 12px;cursor:pointer}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--verd)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+input,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:6px 9px}
+input[type=search]{min-width:0;flex:1 1 200px}
+label.inl{display:inline-flex;gap:6px;align-items:center;color:var(--muted);font-size:14px}
+.tablebox{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;min-width:760px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--surface);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td.num,th.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.name{font-weight:600}
+.link{background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--verd);cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+.why{color:var(--muted);font-size:14px;max-width:52ch}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{font-size:13px;background:var(--ground);border:1px solid var(--line);border-radius:4px;padding:1px 6px;white-space:nowrap}
+.mods{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start}
+.modlist{background:var(--surface);border:1px solid var(--line);border-radius:6px;max-height:70vh;overflow:auto;display:flex;flex-direction:column}
+.modlist button{font:inherit;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:8px 12px;color:var(--ink);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.modlist button[aria-current="true"]{background:var(--verd-soft);color:var(--verd);font-weight:600}
+.modlist small{color:var(--muted);font-family:var(--mono);font-size:12px}
+.modsel{display:none}
+.detail{display:flex;flex-direction:column;gap:14px}
+.dhead{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;justify-content:space-between}
+.dhead h2{margin:0;font-size:24px}
+.io{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.box h3{margin:0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.row{display:flex;justify-content:space-between;gap:10px}
+.row span:last-child{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);font-size:14px}
+.heat{color:var(--copper);font-size:12px;font-weight:600;margin-left:6px}
+.foot{color:var(--muted);font-size:13px}
+@media (max-width:760px){.mods{grid-template-columns:1fr}.modlist{display:none}.modsel{display:block;width:100%}h1{font-size:24px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.mapbox{overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px;max-height:80vh}
+.mapbox pre{margin:0;min-width:900px}
+.yn{display:inline-block;min-width:44px;text-align:center;font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase;padding:3px 10px;border-radius:4px}
+.yn.y{background:var(--copper);color:var(--surface)}
+.yn.n{background:var(--slate-soft);color:var(--slate)}
+.pill.yes{background:var(--copper-soft);color:var(--copper)}
+.pill.sold{background:var(--gold-soft);color:var(--gold)}
+.nm{display:flex;flex-direction:column;gap:2px}
+.sellb{font-size:12px;color:var(--gold);font-family:var(--mono)}
+.chip.busc{border-color:color-mix(in srgb,var(--copper) 45%,transparent);color:var(--copper);background:var(--copper-soft)}
+.chip.shopc{border-color:color-mix(in srgb,var(--gold) 45%,transparent);color:var(--gold);background:var(--gold-soft)}
+.where{font-size:14px;max-width:34ch}
+table.items{min-width:1120px}
+.sortb{font:inherit;font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--muted);background:none;border:0;padding:0;cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+.sortb:hover{color:var(--ink)}
+.sortb::after{content:"↕";opacity:.35;font-size:11px}
+.sortb[data-dir="asc"]{color:var(--verd)}.sortb[data-dir="asc"]::after{content:"▲";opacity:1}
+.sortb[data-dir="desc"]{color:var(--verd)}.sortb[data-dir="desc"]::after{content:"▼";opacity:1}
+th.num .sortb{justify-content:flex-end}
+.fitbar{border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);background:var(--surface)}
+.fitbar.ok{border-left:4px solid var(--verd)}.fitbar.edge{border-left:4px solid var(--gold)}.fitbar.over{border-left:4px solid var(--copper)}
+.fitsub{color:var(--muted);font-size:14px}
+.fitbox{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.tablebox.inner{border:0;border-radius:0}
+table.fitt{min-width:420px}
+table.fitt td,table.fitt th{padding:6px 10px}
+tr.sel td{background:var(--verd-soft)}
+.fitpill{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:4px}
+.fitpill.ok{background:var(--verd-soft);color:var(--verd)}.fitpill.edge{background:var(--gold-soft);color:var(--gold)}.fitpill.over{background:var(--copper-soft);color:var(--copper)}
+td.idle{color:var(--gold)}
+ul.notes{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.maxline{display:flex;flex-direction:column;gap:4px;padding:8px 10px;background:var(--ground);border-radius:5px}
+.maxline .lab{display:inline-block;min-width:200px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.05em}
+.side{display:flex;flex-direction:column;gap:8px}
+.side input[type=search]{flex:0 0 auto}
+.mut{color:var(--muted);font-size:14px}
+.cu{color:var(--copper)}
+.bustag{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--copper);background:var(--copper-soft);border-radius:3px;padding:0 5px;margin-left:4px}
+.row.tot{border-top:1px solid var(--line);padding-top:6px;margin-top:2px;font-weight:600}
+.row small.mut{font-size:12.5px}
+table.ingt{min-width:560px}
+table.ingt td,table.ingt th{padding:6px 10px}
+.src{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 8px;border-radius:4px}
+.src.here{background:var(--verd-soft);color:var(--verd)}
+.src.bus{background:var(--copper-soft);color:var(--copper)}
+.src.coin{background:var(--gold-soft);color:var(--gold)}
+.src.pipe{background:var(--pipe-soft);color:var(--pipe)}
+.swap{font:inherit;font-size:13px;background:none;border:1px solid var(--line);border-radius:5px;padding:3px 9px;color:var(--ink);cursor:pointer;white-space:nowrap}
+.swap:hover{border-color:var(--verd);color:var(--verd)}
+.fithead{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.dhead h3{margin:0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.st{display:inline-block;font-weight:700;font-size:12.5px;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:4px;white-space:nowrap}
+.st.ded{background:var(--copper);color:var(--surface)}
+.st.mix{background:var(--gold);color:var(--surface)}
+.st.maybe{background:var(--verd-soft);color:var(--verd);border:1px dashed var(--verd)}
+.st.no{background:var(--slate-soft);color:var(--slate)}
+.mine{font-size:12px;color:var(--muted);margin-top:3px}
+.chip.resc{border-color:color-mix(in srgb,var(--verd) 45%,transparent);color:var(--verd);background:var(--verd-soft)}
+.legendlist{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.legendlist li{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:baseline;font-size:14px}
+.sep{flex-basis:8px}
+.bad{color:var(--copper);font-weight:700}
+.choices{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--gold-soft);border:1px solid color-mix(in srgb,var(--gold) 40%,transparent);border-radius:6px;padding:10px 14px}
+.chip.pick{background:var(--surface);display:inline-flex;gap:6px;align-items:center;padding:2px 4px 2px 8px}
+.chip.pick .x{font:inherit;border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:0 4px}
+.chip.pick .x:hover{color:var(--copper)}
+.resetbtn{font:inherit;font-weight:600;margin-left:auto;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:5px 12px;color:var(--ink);cursor:pointer}
+.resetbtn:hover{border-color:var(--copper);color:var(--copper)}
+table.items{min-width:900px;table-layout:auto}
+table.items td.nmc,table.items td.stc,table.items td.act{white-space:nowrap;width:1%}
+table.items td.num{width:1%}
+table.items td.why{max-width:none;min-width:340px;width:55%}
+table.items td.usedc{min-width:120px;max-width:260px;width:20%}
+tr.itemhead th{white-space:nowrap}
+@media (max-width:760px){.side{display:none}.legendlist li{grid-template-columns:1fr}}
+`;
+let head=fs.readFileSync('head.html','utf8');
+if(!head.includes('.bustag')) head=head.replace('</style>',EXTRA+'</style>');
+const core=fs.readFileSync('core.js','utf8').replace(/if\(typeof module!=='undefined'\)[^\n]*\n?/,'');
+const ui=fs.readFileSync('ui.js','utf8');
+const data=fs.readFileSync('data2.json','utf8');
+const script='const DATA='+data+';\n'+core+'\n'+ui;
+fs.writeFileSync('bus-split-planner.html', head+fs.readFileSync('body2.html','utf8')+'<script>\n'+script+'\n</script>\n');
+console.log('page bytes',fs.statSync('bus-split-planner.html').size);
+
+// ---- smoke test with a stub DOM ----
+const els={};
+const mk=id=>({id,value:'',innerHTML:'',textContent:'',hidden:false,dataset:{},children:[],attrs:{},
+  setAttribute(k,v){this.attrs[k]=String(v);},getAttribute(k){return this.attrs[k];},addEventListener(){},appendChild(c){this.children.push(c);},closest(){return null;}});
+const doc={getElementById:id=>els[id]||(els[id]=mk(id)),createElement:()=>mk('_'),querySelectorAll:()=>[]};
+const init={fe:'0',mL:'14',mW:'14',mH:'15',connmax:'8'}; for(const k in init) doc.getElementById(k).value=init[k];
+const store={}; const ls={getItem:k=>store[k]||null,setItem:(k,v)=>{store[k]=v;}};
+const fn=new Function('document','localStorage','window',script+'\n;return {openMod,renderMod,renderItems,decide,status,line,cutsFor,C};');
+const api=fn(doc,ls,{scrollTo(){}});
+const strip=h=>h.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+console.log('\n[items tab]',els.count.textContent);
+console.log(strip(els.rows.innerHTML).slice(0,600));
+console.log('\n[Jupiter module] meta:',strip(els.mmeta.innerHTML));
+console.log('fit:',strip(els.fit.innerHTML).slice(0,420));
+console.log('bus in:',strip(els.busin.innerHTML));
+console.log('coins:',strip(els.coins.innerHTML));
+console.log('out:',strip(els.outp.innerHTML));
+console.log('ingredients:',strip(els.ingr.innerHTML));
+console.log('machines:',strip(els.mrows.innerHTML),'|',els.mtot.textContent);
+api.decide('Linen Rope','bus'); api.openMod('Jupiter'); console.log('[rope on bus -> Jupiter] bus in:',strip(els.busin.innerHTML),'| fit:',strip(els.fit.innerHTML).slice(0,90)); for(const m of ['Saturn','Mars','Glass','Steel Ingot']){ api.openMod(m); const f=strip(els.fit.innerHTML); console.log('['+m+' sizes]',f.slice(f.indexOf('Sizes worth'),f.indexOf('Fill is the')),'| conn:',strip(els.conn.innerHTML)); } for(const n of ['Steel Gear','Steel Ingot','Clay Powder','Brick']){const st=api.status(n);console.log('<'+n+'>',st.code,'-',st.why);} api.openMod('Wooden Pulley'); console.log('[rope on bus -> Pulley] bus in:',strip(els.busin.innerHTML)); api.decide('Linen Rope',null);
+for(const m of ['Saturn','Clay','Venus','Coke Powder']){ api.openMod(m); console.log('\n['+m+'] rate',els.rate.value,'| bus in:',strip(els.busin.innerHTML),'| coins:',strip(els.coins.innerHTML).slice(0,160),'| out:',strip(els.outp.innerHTML),'| fit:',strip(els.fit.innerHTML).slice(0,110)); }
+for(const n of ['Linen Rope','Linen Thread','Plank','Charcoal Powder','Jupiter','Glass','Wooden Pulley','Mortar','Healing Potion','Coke Powder','Brick']){const st=api.status(n);console.log('<'+n+'>',st.code,'-',st.why);}
+console.log('\n[rates tab]',strip(els.rrows.innerHTML).slice(0,400));
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Bus Split Planner</h1>
+    <p class="sub">What goes on the bus, what each module needs, and whether it fits. Every number comes from the recipe data (<span id="ver"></span>) at base speeds, with every machine capped at one belt of output.</p>
+  </header>
+
+  <section class="rule" aria-label="Settings and the rule">
+    <div class="controls">
+      <label class="inl" for="tier">Show items up to tier <select id="tier"></select></label>
+      <span class="inl">Tile size <label for="mL" class="vh">Length</label><input type="number" id="mL" min="1" step="1" value="14" style="width:54px"> × <label for="mW" class="vh">Width</label><input type="number" id="mW" min="1" step="1" value="14" style="width:54px"> × <label for="mH" class="vh">Height</label><input type="number" id="mH" min="1" step="1" value="15" style="width:54px"> <small class="mut">L × W × H</small></span>
+      <label class="inl" for="fe">Fuel Efficiency level <input type="number" id="fe" min="0" step="1" value="0" style="width:60px"></label>
+      <label class="inl" for="connmax">Bus connections per tile <input type="number" id="connmax" min="1" step="1" value="8" style="width:56px"> <small class="mut">each carries 120/min (two belts)</small></label>
+    </div>
+    <div><b>How the bus line is drawn.</b> A module makes everything it needs inside its own tile, from coins, whenever that fits. Each item then lands in one of four places:</div>
+    <ul class="legendlist">
+      <li><span class="st ded">Yes · own wagons</span> A module that needs it can't fit making it, so it gets its own module and its own tagged wagons. Coke powder and advanced fertilizer are always here.</li>
+      <li><span class="st mix">Yes · shared wagon</span> Relics. They only go to the shop and to research, so they can all ride one "research" wagon type instead of one each.</li>
+      <li><span class="st maybe">Maybe</span> Packed-down items that only one or two things use. They fit inside the module that uses them, or you can give them their own module and bus them. Your call.</li>
+      <li><span class="st no">No</span> Bulk, raw, grown or liquid stuff, and things that are only sold. Made right where they're used, or next to the shop.</li>
+    </ul>
+    <div class="mut">Press "Put it on the bus" or "Keep it off the bus" on any item and every module that uses it updates to match.</div>
+  </section>
+
+  <div class="choices" id="choices" hidden>
+    <b>Your choices</b>
+    <span id="choicelist" class="chips"></span>
+    <button class="resetbtn" id="undoall">Reset all to defaults</button>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-items" aria-selected="true" aria-controls="pane-items">What goes on the bus</button>
+    <button class="tab" role="tab" id="tab-mods" aria-selected="false" aria-controls="pane-mods">Build a module</button>
+    <button class="tab" role="tab" id="tab-rates" aria-selected="false" aria-controls="pane-rates">Machine rates</button>
+  </div>
+
+  <section id="pane-items" role="tabpanel" aria-labelledby="tab-items" class="pane">
+    <div class="controls">
+      <input type="search" id="q" placeholder="Search an item…" aria-label="Search items">
+      <button class="pill yes" id="f-ded" aria-pressed="true">Yes · own wagons</button>
+      <button class="pill sold" id="f-mix" aria-pressed="true">Yes · shared wagon</button>
+      <button class="pill inside" id="f-maybe" aria-pressed="true">Maybe</button>
+      <button class="pill site" id="f-no" aria-pressed="true">No</button>
+      <span class="sep"></span>
+      <button class="pill sold" id="f-sold" aria-pressed="false">Only things I sell</button>
+      <button class="pill site" id="f-basic" aria-pressed="true">Hide raw, crops &amp; liquids</button>
+      <span class="mut" id="count"></span>
+    </div>
+    <div class="tablebox"><table class="items">
+      <thead><tr id="sorthead" class="itemhead">
+        <th><button class="sortb" data-k="item">Item</button></th>
+        <th><button class="sortb" data-k="bus">On the bus?</button></th>
+        <th><button class="sortb" data-k="why">Why</button></th>
+        <th>Your call</th>
+        <th><button class="sortb" data-k="used">Used by</button></th>
+        <th class="num"><button class="sortb" data-k="sell">Sells</button></th>
+        <th class="num"><button class="sortb" data-k="tier" title="The tier the item unlocks at, from the recipe data">Tier</button></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <p class="foot">Click an item's name to open its module. Every item that's made in a machine has one, whether it's on the bus or not.</p>
+  </section>
+
+  <section id="pane-mods" role="tabpanel" aria-labelledby="tab-mods" class="pane" hidden>
+    <div class="mods">
+      <div class="side">
+        <input type="search" id="mq" placeholder="Find a module…" aria-label="Find a module">
+        <nav class="modlist" id="modlist" aria-label="Modules"></nav>
+      </div>
+      <div class="detail">
+        <select class="modsel" id="modsel" aria-label="Choose module"></select>
+        <div class="dhead">
+          <div><h2 id="mname"></h2><div class="mut" id="mmeta"></div></div>
+          <div class="controls">
+            <label class="inl" for="rate">Output <input type="number" id="rate" min="0" step="any" style="width:96px"> /min</label>
+            <span class="inl">Tile size <label for="mL2" class="vh">Length</label><input type="number" id="mL2" min="1" step="1" style="width:54px" title="Length"> × <label for="mW2" class="vh">Width</label><input type="number" id="mW2" min="1" step="1" style="width:54px" title="Width"> × <label for="mH2" class="vh">Height</label><input type="number" id="mH2" min="1" step="1" style="width:54px" title="Height"> <small class="mut">L × W × H</small></span>
+          </div>
+        </div>
+        <div id="fit"></div>
+        <div class="io">
+          <div class="box"><h3>Comes off the bus</h3><div id="busin"></div></div>
+          <div class="box"><h3>Coins buy</h3><div id="coins"></div></div>
+          <div class="box"><h3>Comes out</h3><div id="outp"></div></div>
+          <div class="box"><h3>Bus connections used</h3><div id="conn"></div></div>
+        </div>
+        <div class="box">
+          <div class="dhead"><h3>Every ingredient, and where it comes from</h3></div>
+          <div class="tablebox inner"><table class="ingt">
+            <thead><tr><th>Ingredient</th><th class="num">Needed</th><th>Where it comes from</th><th></th></tr></thead>
+            <tbody id="ingr"></tbody>
+          </table></div>
+          <p class="fitsub">Put any ingredient on the bus, or keep it off, to see what it does to the size, the machines and what the bus has to carry. The choice applies to every module that uses that ingredient. Anything under an off-the-bus ingredient disappears from this module, because another module makes it.</p>
+        </div>
+        <div class="tablebox"><table>
+          <thead><tr><th>Machine</th><th>Makes</th><th class="num">One machine makes</th><th class="num">Exact</th><th class="num">Build</th><th class="num">Busy</th></tr></thead>
+          <tbody id="mrows"></tbody>
+        </table></div>
+        <div class="mut" id="mtot"></div>
+        <div id="notes"></div>
+        <p class="foot">Fuel is coke powder at 660 heat each, plus 10% per Fuel Efficiency level. Nurseries run on advanced fertilizer. A byproduct the module reuses (like the Athanor's charcoal) is taken off the machine counts first.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="pane-rates" role="tabpanel" aria-labelledby="tab-rates" class="pane" hidden>
+    <div class="controls"><input type="search" id="rq" placeholder="Search a recipe or machine…" aria-label="Search recipes"></div>
+    <div class="tablebox"><table class="items">
+      <thead><tr><th>Makes</th><th>Machine</th><th>One machine takes, per minute</th><th>One machine makes, per minute</th><th class="num">Heat /s</th><th>Note</th><th class="num">Tier</th></tr></thead>
+      <tbody id="rrows"></tbody>
+    </table></div>
+    <p class="foot">These are the numbers everything else on this page is built from. If one doesn't match what the machine shows in your game at base speed, that's the one that's wrong.</p>
+  </section>
+</div>
+<script>
+const DATA={"items":{"Logs":{"tier":1,"sell":0,"buy":200,"liq":false,"kind":"raw","cat":"Raw Materials","uses":["Plank"],"dense":false,"relic":false,"rtxt":""},"Limestone":{"tier":2,"sell":0,"buy":600,"liq":false,"kind":"raw","cat":"Raw Materials","uses":["Stone","Oblivion Essence"],"dense":false,"relic":false,"rtxt":""},"Iron Ore":{"tier":3,"sell":0,"buy":1200,"liq":false,"kind":"raw","cat":"Raw Materials","uses":["Iron Ingot"],"dense":false,"relic":false,"rtxt":""},"Pyrite Ore":{"tier":6,"sell":0,"buy":11000,"liq":false,"kind":"raw","cat":"Raw Materials","uses":["Sulfur"],"dense":false,"relic":false,"rtxt":""},"Rock Salt":{"tier":6,"sell":0,"buy":9000,"liq":false,"kind":"raw","cat":"Raw Materials","uses":[],"dense":false,"relic":false,"rtxt":""},"Coal Ore":{"tier":5,"sell":0,"buy":4800,"liq":false,"kind":"raw","cat":"Raw Materials","uses":["Coal"],"dense":false,"relic":false,"rtxt":""},"Rotten Log":{"tier":5,"sell":0,"buy":2000,"liq":false,"kind":"raw","cat":"Raw Materials","uses":["Gloom Fungus"],"dense":false,"relic":false,"rtxt":""},"Quartz Ore":{"tier":7,"sell":0,"buy":44000,"liq":false,"kind":"raw","cat":"Raw Materials","uses":["Crude Shard"],"dense":false,"relic":false,"rtxt":""},"Meteorite":{"tier":9,"sell":0,"buy":2000000,"liq":false,"kind":"raw","cat":"Raw Materials","uses":[],"dense":false,"relic":false,"rtxt":""},"Flax Seeds":{"tier":2,"sell":0,"buy":280,"liq":false,"kind":"raw","cat":"Raw Materials","uses":[],"dense":false,"relic":false,"rtxt":""},"Sage Seeds":{"tier":3,"sell":0,"buy":360,"liq":false,"kind":"raw","cat":"Raw Materials","uses":[],"dense":false,"relic":false,"rtxt":""},"Redcurrant Seeds":{"tier":4,"sell":0,"buy":1300,"liq":false,"kind":"raw","cat":"Raw Materials","uses":[],"dense":false,"relic":false,"rtxt":""},"Chamomile Seeds":{"tier":6,"sell":0,"buy":6000,"liq":false,"kind":"raw","cat":"Raw Materials","uses":[],"dense":false,"relic":false,"rtxt":""},"Lavender Seeds":{"tier":7,"sell":0,"buy":16000,"liq":false,"kind":"raw","cat":"Raw Materials","uses":[],"dense":false,"relic":false,"rtxt":""},"Gentian Seeds":{"tier":8,"sell":0,"buy":64000,"liq":false,"kind":"raw","cat":"Raw Materials","uses":[],"dense":false,"relic":false,"rtxt":""},"World Tree Seed":{"tier":8,"sell":0,"buy":5000000,"liq":false,"kind":"raw","cat":"Raw Materials","uses":[],"dense":false,"relic":false,"rtxt":""},"Flax":{"tier":2,"sell":0,"buy":0,"liq":false,"kind":"crop","cat":"Herbs","uses":["Flax Fiber","Linseed Oil"],"dense":false,"relic":false,"rtxt":""},"Sage":{"tier":3,"sell":0,"buy":0,"liq":false,"kind":"crop","cat":"Herbs","uses":["Sage Powder","Plant Ash"],"dense":false,"relic":false,"rtxt":""},"Redcurrant":{"tier":4,"sell":0,"buy":0,"liq":false,"kind":"crop","cat":"Herbs","uses":["Fruit Wine"],"dense":false,"relic":false,"rtxt":""},"Chamomile":{"tier":6,"sell":0,"buy":0,"liq":false,"kind":"crop","cat":"Herbs","uses":["Chamomile Powder"],"dense":false,"relic":false,"rtxt":""},"Lavender":{"tier":7,"sell":0,"buy":0,"liq":false,"kind":"crop","cat":"Herbs","uses":["Lavender Essential Oil"],"dense":false,"relic":false,"rtxt":""},"Gentian":{"tier":8,"sell":0,"buy":0,"liq":false,"kind":"crop","cat":"Herbs","uses":["Gentian Powder"],"dense":false,"relic":false,"rtxt":""},"Gentian Nectar":{"tier":8,"sell":0,"buy":0,"liq":false,"kind":"crop","cat":"Herbs","uses":["Aqua Vitae"],"dense":false,"relic":false,"rtxt":""},"World Tree Leaf":{"tier":8,"sell":0,"buy":0,"liq":false,"kind":"crop","cat":"Herbs","uses":["Aqua Vitae","Fairy Dust"],"dense":false,"relic":false,"rtxt":""},"World Tree Core":{"tier":8,"sell":0,"buy":0,"liq":false,"kind":"crop","cat":"Herbs","uses":["Sapphire","Sol"],"dense":false,"relic":false,"rtxt":""},"Flax Fiber":{"tier":2,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":["Linen Thread","Healing Potion"],"dense":false,"relic":false,"rtxt":"1 Flax → 1 Flax Fiber"},"Linen Thread":{"tier":2,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":["Linen Rope","Linen"],"dense":true,"relic":false,"rtxt":"3 Flax Fiber → 1 Linen Thread"},"Linen Rope":{"tier":2,"sell":36,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":["Wooden Pulley"],"dense":true,"relic":false,"rtxt":"2 Linen Thread → 1 Linen Rope"},"Linen":{"tier":3,"sell":165,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":["Bandage"],"dense":true,"relic":false,"rtxt":"10 Linen Thread → 1 Linen"},"Bandage":{"tier":3,"sell":350,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":[],"dense":true,"relic":false,"rtxt":"1 Linen + 2 Healing Potion → 1 Bandage"},"Plant Ash":{"tier":3,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":["Soap","Basic Fertilizer"],"dense":false,"relic":false,"rtxt":"1 Sage → 1 Plant Ash"},"Sage Powder":{"tier":3,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":["Healing Potion"],"dense":false,"relic":false,"rtxt":"1 Sage → 1 Sage Powder"},"Soap":{"tier":4,"sell":60,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":["Soap Powder"],"dense":true,"relic":false,"rtxt":"3 Plant Ash → 1 Soap"},"Soap Powder":{"tier":4,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":["Perfumed Soap","Yeast Powder","Copper Powder"],"dense":true,"relic":false,"rtxt":"1 Soap → 1 Soap Powder"},"Chamomile Powder":{"tier":6,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":["Growth Potion","Unstable Catalyst","Fairy Dust"],"dense":false,"relic":false,"rtxt":"1 Chamomile → 1 Chamomile Powder"},"Perfumed Soap":{"tier":7,"sell":2590,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":["Perfumed Soap Powder"],"dense":true,"relic":false,"rtxt":"4 Soap Powder → 1 Perfumed Soap"},"Perfumed Soap Powder":{"tier":8,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":["Moonlit Soap"],"dense":true,"relic":false,"rtxt":"1 Perfumed Soap → 1 Perfumed Soap Powder"},"Gentian Powder":{"tier":8,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Bio-Based","uses":["Fairy Dust"],"dense":false,"relic":false,"rtxt":"1 Gentian → 1 Gentian Powder"},"Charcoal":{"tier":3,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Fuel","uses":["Charcoal Powder"],"dense":false,"relic":false,"rtxt":"1 Plank → 1 Charcoal"},"Charcoal Powder":{"tier":3,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Fuel","uses":["Clay","Coke","Black Powder","Salt"],"dense":false,"relic":false,"rtxt":"1 Charcoal → 1 Charcoal Powder"},"Coke":{"tier":5,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Fuel","uses":["Coke Powder"],"dense":true,"relic":false,"rtxt":"12 Charcoal Powder → 1 Coke + 2 Charcoal"},"Coke Powder":{"tier":5,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Fuel","uses":["Steel Ingot","Brandy","Transformation Potion"],"dense":true,"relic":false,"rtxt":"1 Coke → 1 Coke Powder"},"Coal":{"tier":5,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Fuel","uses":[],"dense":false,"relic":false,"rtxt":"1 Coal Ore → 120 Coal"},"Black Powder":{"tier":6,"sell":660,"buy":0,"liq":false,"kind":"made","cat":"Fuel","uses":["Silver Powder","Blast Potion"],"dense":true,"relic":false,"rtxt":"1 Sulfur Powder + 12 Charcoal Powder → 1 Black Powder"},"Basic Fertilizer":{"tier":4,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Fertilizer","uses":["Advanced Fertilizer"],"dense":true,"relic":false,"rtxt":"1 Plant Ash + 1 Quicklime Powder → 1 Basic Fertilizer"},"Advanced Fertilizer":{"tier":5,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Fertilizer","uses":[],"dense":true,"relic":false,"rtxt":"1 Basic Fertilizer + 1 Gloom Fungus → 1 Advanced Fertilizer"},"Healing Potion":{"tier":3,"sell":85,"buy":0,"liq":false,"kind":"made","cat":"Potion","uses":["Bandage","Turquoise","Venus"],"dense":true,"relic":false,"rtxt":"6 Sage Powder + 6 Flax Fiber → 1 Healing Potion"},"Vitality Potion":{"tier":4,"sell":330,"buy":0,"liq":false,"kind":"made","cat":"Potion","uses":["Venus"],"dense":true,"relic":false,"rtxt":"4 Quicklime Powder → 1 Vitality Potion"},"Transformation Potion":{"tier":5,"sell":620,"buy":0,"liq":false,"kind":"made","cat":"Potion","uses":["Venus"],"dense":true,"relic":false,"rtxt":"2 Coke Powder + 1 Gloom Spores → 1 Transformation Potion"},"Growth Potion":{"tier":6,"sell":1224,"buy":0,"liq":false,"kind":"made","cat":"Potion","uses":["Venus"],"dense":true,"relic":false,"rtxt":"2 Chamomile Powder + 6 Clay Powder → 1 Growth Potion"},"Blast Potion":{"tier":7,"sell":2557,"buy":0,"liq":false,"kind":"made","cat":"Potion","uses":["Panacea Potion","Venus"],"dense":true,"relic":false,"rtxt":"1 Oblivion Essence + 1 Black Powder → 1 Blast Potion"},"Panacea Potion":{"tier":8,"sell":30000,"buy":0,"liq":false,"kind":"made","cat":"Potion","uses":[],"dense":true,"relic":false,"rtxt":"3 Fertile Catalyst + 3 Blast Potion → 1 Panacea Potion"},"Crude Shard":{"tier":7,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Crystal","uses":["Broken Shard","Topaz"],"dense":false,"relic":false,"rtxt":"1 Quartz Ore → 80 Crude Shard"},"Broken Shard":{"tier":7,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Crystal","uses":["Dull Shard"],"dense":true,"relic":false,"rtxt":"2 Crude Shard → 1 Broken Shard"},"Dull Shard":{"tier":7,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Crystal","uses":["Shattered Crystal"],"dense":true,"relic":false,"rtxt":"2 Broken Shard → 1 Dull Shard"},"Shattered Crystal":{"tier":7,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Crystal","uses":["Crude Crystal","Lapis Lazuli","Obsidian"],"dense":true,"relic":false,"rtxt":"2 Dull Shard → 1 Shattered Crystal"},"Crude Crystal":{"tier":7,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Crystal","uses":["Polished Crystal"],"dense":true,"relic":false,"rtxt":"2 Shattered Crystal → 1 Crude Crystal"},"Polished Crystal":{"tier":7,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Crystal","uses":["Adamant"],"dense":true,"relic":false,"rtxt":"2 Crude Crystal → 1 Polished Crystal"},"Adamant":{"tier":7,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Crystal","uses":["Diamond"],"dense":true,"relic":false,"rtxt":"2 Polished Crystal → 1 Adamant"},"Diamond":{"tier":7,"sell":100000,"buy":0,"liq":false,"kind":"made","cat":"Crystal","uses":["Perfect Diamond","Ruby"],"dense":true,"relic":false,"rtxt":"2 Adamant → 1 Diamond"},"Perfect Diamond":{"tier":7,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Crystal","uses":["Sapphire","Sol"],"dense":true,"relic":false,"rtxt":"2 Diamond → 1 Perfect Diamond"},"Plank":{"tier":1,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":["Large Wooden Gear","Wooden Pulley","Charcoal","Jupiter"],"dense":false,"relic":false,"rtxt":"1 Logs → 200 Plank"},"Large Wooden Gear":{"tier":1,"sell":5,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":["Small Wooden Gear"],"dense":false,"relic":false,"rtxt":"1 Plank → 1 Large Wooden Gear"},"Small Wooden Gear":{"tier":2,"sell":8,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":["Jupiter"],"dense":false,"relic":false,"rtxt":"1 Large Wooden Gear → 3 Small Wooden Gear"},"Iron Nails":{"tier":3,"sell":16,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":["Mars"],"dense":false,"relic":false,"rtxt":"1 Iron Ingot → 3 Iron Nails"},"Stone":{"tier":2,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":["Sand","Mortar","Quicklime"],"dense":false,"relic":false,"rtxt":"1 Limestone → 150 Stone"},"Clay":{"tier":4,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":["Clay Powder","Brick"],"dense":true,"relic":false,"rtxt":"2 Charcoal Powder + 4 Sand → 1 Clay"},"Brick":{"tier":4,"sell":70,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":["Saturn"],"dense":true,"relic":false,"rtxt":"1 Clay → 1 Brick"},"Glass":{"tier":4,"sell":75,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":["Pocket Watch","Saturn"],"dense":true,"relic":false,"rtxt":"6 Sand → 1 Glass"},"Wooden Pulley":{"tier":4,"sell":44,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":["Jupiter"],"dense":true,"relic":false,"rtxt":"2 Plank + 1 Linen Rope → 1 Wooden Pulley"},"Cart":{"tier":4,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":[],"dense":true,"relic":false,"rtxt":"5 Iron Ingot → 1 Cart"},"Steel Gear":{"tier":5,"sell":450,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":["Clockwork Bird","Pocket Watch","Mars"],"dense":true,"relic":false,"rtxt":"1 Steel Ingot → 1 Steel Gear"},"Copper Bearing":{"tier":6,"sell":300,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":["Pocket Watch","Mars"],"dense":false,"relic":false,"rtxt":"1 Copper Ingot → 2 Copper Bearing"},"Bronze Rivet":{"tier":6,"sell":120,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":["Mars"],"dense":false,"relic":false,"rtxt":"1 Bronze Ingot → 3 Bronze Rivet"},"Marble":{"tier":8,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Component","uses":[],"dense":true,"relic":false,"rtxt":"4 Oblivion Essence + 2 Shattered Crystal → 1 Obsidian + 1 Marble"},"Iron Ingot":{"tier":3,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Iron Nails","Cart","Iron Sand","Steel Ingot"],"dense":false,"relic":false,"rtxt":"1 Iron Ore → 100 Iron Ingot"},"Steel Ingot":{"tier":5,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Steel Gear","Clockwork Bird","Luna"],"dense":true,"relic":false,"rtxt":"4 Iron Ingot + 4 Coke Powder → 1 Steel Ingot + 3 Iron Ingot"},"Bronze Ingot":{"tier":6,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Bronze Rivet","Luna"],"dense":true,"relic":false,"rtxt":"1 Impure Copper Powder → 1 Bronze Ingot"},"Copper Ingot":{"tier":6,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Copper Bearing","Luna"],"dense":true,"relic":false,"rtxt":"1 Copper Powder → 1 Copper Ingot"},"Silver Ingot":{"tier":8,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Silver Amulet","Luna"],"dense":true,"relic":false,"rtxt":"1 Silver Powder → 1 Silver Ingot"},"Gold Ingot":{"tier":9,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Crown","Luna"],"dense":true,"relic":false,"rtxt":"1 Pure Gold Dust → 1 Gold Ingot"},"Iron Sand":{"tier":3,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Copper Powder"],"dense":false,"relic":false,"rtxt":"1 Iron Ingot → 1 Iron Sand"},"Impure Copper Powder":{"tier":6,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Bronze Ingot","Malachite"],"dense":true,"relic":false,"rtxt":"12 Iron Sand + 12 Soap Powder → 1 Copper Powder + 1 Impure Copper Powder"},"Copper Powder":{"tier":6,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Copper Ingot","Silver Powder"],"dense":true,"relic":false,"rtxt":"12 Iron Sand + 12 Soap Powder → 1 Copper Powder + 1 Impure Copper Powder"},"Crude Silver Powder":{"tier":8,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Impure Silver Powder","Quicksilver"],"dense":true,"relic":false,"rtxt":"40 Copper Powder + 20 Black Powder → 2 Silver Powder + 8 Crude Silver Powder"},"Impure Silver Powder":{"tier":8,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Lapis Lazuli"],"dense":true,"relic":false,"rtxt":"2 Crude Silver Powder → 1 Impure Silver Powder"},"Silver Powder":{"tier":8,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Silver Ingot","Gold Dust"],"dense":true,"relic":false,"rtxt":"40 Copper Powder + 20 Black Powder → 2 Silver Powder + 8 Crude Silver Powder"},"Crude Gold Dust":{"tier":9,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Impure Gold Dust"],"dense":true,"relic":false,"rtxt":"10 Silver Powder + 10 Volcanic Ash → 1 Gold Dust + 3 Impure Gold Dust + 6 Crude Gold Dust"},"Impure Gold Dust":{"tier":9,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":[],"dense":true,"relic":false,"rtxt":"2 Crude Gold Dust → 1 Impure Gold Dust"},"Gold Dust":{"tier":9,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Pure Gold Dust","Ruby"],"dense":true,"relic":false,"rtxt":"10 Silver Powder + 10 Volcanic Ash → 1 Gold Dust + 3 Impure Gold Dust + 6 Crude Gold Dust"},"Pure Gold Dust":{"tier":9,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Metal","uses":["Gold Ingot"],"dense":true,"relic":false,"rtxt":"2 Gold Dust → 1 Pure Gold Dust"},"Linseed Oil":{"tier":4,"sell":0,"buy":0,"liq":true,"kind":"made","cat":"Liquid","uses":["Soap","Lavender Essential Oil"],"dense":false,"relic":false,"rtxt":"1 Flax → "},"Fruit Wine":{"tier":4,"sell":0,"buy":0,"liq":true,"kind":"made","cat":"Liquid","uses":["Yeast Powder","Brandy","Vitality Potion"],"dense":false,"relic":false,"rtxt":"1 Redcurrant → "},"Limewater":{"tier":4,"sell":0,"buy":0,"liq":true,"kind":"made","cat":"Liquid","uses":["Black Powder"],"dense":false,"relic":false,"rtxt":"1 Quicklime Powder → "},"Brine":{"tier":6,"sell":0,"buy":0,"liq":true,"kind":"made","cat":"Liquid","uses":["Sulfuric Acid","Growth Potion"],"dense":false,"relic":false,"rtxt":"1 Salt → "},"Lavender Essential Oil":{"tier":7,"sell":0,"buy":0,"liq":true,"kind":"made","cat":"Liquid","uses":["Perfumed Soap","Fertile Catalyst"],"dense":false,"relic":false,"rtxt":"3 Lavender → "},"Brandy":{"tier":7,"sell":0,"buy":0,"liq":true,"kind":"made","cat":"Liquid","uses":["Aqua Vitae","Blast Potion"],"dense":false,"relic":false,"rtxt":"5 Coke Powder → "},"Sulfuric Acid":{"tier":7,"sell":0,"buy":0,"liq":true,"kind":"made","cat":"Liquid","uses":["Quicksilver","Topaz","Venus"],"dense":false,"relic":false,"rtxt":"1 Sulfur Powder → "},"Quicksilver":{"tier":8,"sell":0,"buy":0,"liq":true,"kind":"made","cat":"Liquid","uses":["Gold Dust","Mercury"],"dense":false,"relic":false,"rtxt":"1 Crude Silver Powder + 1 Vitality Essence → "},"Aqua Vitae":{"tier":8,"sell":0,"buy":0,"liq":true,"kind":"made","cat":"Liquid","uses":["Panacea Potion","Resonant Catalyst"],"dense":false,"relic":false,"rtxt":"1 Gentian Nectar + 1 World Tree Leaf → "},"Fairy Tear":{"tier":9,"sell":0,"buy":0,"liq":true,"kind":"made","cat":"Liquid","uses":["Moon Tear"],"dense":false,"relic":false,"rtxt":"1 Fairy Dust → "},"Moon Tear":{"tier":9,"sell":0,"buy":0,"liq":true,"kind":"made","cat":"Liquid","uses":["Moonlit Soap","Luna"],"dense":false,"relic":false,"rtxt":"1 Star Dust → "},"Sand":{"tier":2,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Mash","uses":["Clay","Glass","Turquoise"],"dense":false,"relic":false,"rtxt":"1 Stone → 1 Sand"},"Quicklime":{"tier":3,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Mash","uses":["Quicklime Powder"],"dense":false,"relic":false,"rtxt":"1 Stone → 1 Quicklime"},"Quicklime Powder":{"tier":3,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Mash","uses":["Salt","Limewater","Vitality Potion","Basic Fertilizer"],"dense":false,"relic":false,"rtxt":"1 Quicklime → 1 Quicklime Powder"},"Clay Powder":{"tier":4,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Mash","uses":["Growth Potion","Malachite"],"dense":true,"relic":false,"rtxt":"1 Clay → 1 Clay Powder"},"Yeast Powder":{"tier":5,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Mash","uses":["Gloom Spores"],"dense":true,"relic":false,"rtxt":"2 Soap Powder → 1 Yeast Powder"},"Gloom Fungus":{"tier":5,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Mash","uses":["Gloom Spores","Advanced Fertilizer"],"dense":false,"relic":false,"rtxt":"1 Rotten Log → 40 Gloom Fungus + 160 Plank"},"Gloom Spores":{"tier":5,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Mash","uses":["Transformation Potion","Unstable Catalyst"],"dense":true,"relic":false,"rtxt":"2 Gloom Fungus + 1 Yeast Powder → 1 Gloom Spores"},"Salt":{"tier":6,"sell":100,"buy":0,"liq":false,"kind":"made","cat":"Mash","uses":["Brine","Saturn"],"dense":true,"relic":false,"rtxt":"6 Charcoal Powder + 12 Quicklime Powder → 1 Salt + 12 Sand"},"Sulfur":{"tier":6,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Mash","uses":["Sulfur Powder"],"dense":false,"relic":false,"rtxt":"1 Pyrite Ore → 40 Sulfur + 120 Iron Ingot"},"Sulfur Powder":{"tier":6,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Mash","uses":["Black Powder","Sulfuric Acid"],"dense":false,"relic":false,"rtxt":"1 Sulfur → 1 Sulfur Powder"},"Unstable Catalyst":{"tier":6,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Catalyst","uses":["Fertile Catalyst","Sapphire"],"dense":true,"relic":false,"rtxt":"2 Chamomile Powder + 2 Gloom Spores → 1 Unstable Catalyst"},"Fertile Catalyst":{"tier":7,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Catalyst","uses":["Panacea Potion","Resonant Catalyst","Emerald"],"dense":true,"relic":false,"rtxt":"1 Unstable Catalyst + 1 Vitality Essence → 1 Fertile Catalyst"},"Resonant Catalyst":{"tier":8,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Catalyst","uses":["Eternal Catalyst","Ruby"],"dense":true,"relic":false,"rtxt":"1 Fertile Catalyst + 1 Volcanic Ash → 1 Resonant Catalyst"},"Eternal Catalyst":{"tier":9,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Catalyst","uses":["Sol"],"dense":true,"relic":false,"rtxt":"15 Resonant Catalyst + 1 Philosopherˈs Stone → 1 Eternal Catalyst"},"Philosopherˈs Stone":{"tier":9,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Magic","uses":["Eternal Catalyst"],"dense":true,"relic":false,"rtxt":"1 Ruby + 1 Sapphire + 1 Emerald → 1 Philosopherˈs Stone"},"Oblivion Essence":{"tier":7,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Magic","uses":["Blast Potion","Vitality Essence","Obsidian"],"dense":false,"relic":false,"rtxt":"1 Limestone → 1 Oblivion Essence"},"Vitality Essence":{"tier":7,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Magic","uses":["Quicksilver","Fertile Catalyst"],"dense":false,"relic":false,"rtxt":"1 Oblivion Essence → 1 Vitality Essence"},"Star Dust":{"tier":9,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Magic","uses":["Moon Tear"],"dense":false,"relic":false,"rtxt":"1 Jupiter + 1 Saturn + 1 Mars → 5 Star Dust"},"Fairy Dust":{"tier":9,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Magic","uses":["Fairy Tear"],"dense":true,"relic":false,"rtxt":"1 Chamomile Powder + 1 Gentian Powder + 1 World Tree Leaf → 1 Fairy Dust"},"Ruby":{"tier":9,"sell":250000,"buy":0,"liq":false,"kind":"made","cat":"Jewelry","uses":["Crown","Philosopherˈs Stone"],"dense":true,"relic":false,"rtxt":"1 Diamond + 1 Gold Dust + 1 Resonant Catalyst → 1 Ruby"},"Sapphire":{"tier":9,"sell":480000,"buy":0,"liq":false,"kind":"made","cat":"Jewelry","uses":["Crown","Philosopherˈs Stone"],"dense":true,"relic":false,"rtxt":"1 Perfect Diamond + 1 World Tree Core + 1 Unstable Catalyst → 1 Sapphire"},"Emerald":{"tier":9,"sell":700000,"buy":0,"liq":false,"kind":"made","cat":"Jewelry","uses":["Philosopherˈs Stone"],"dense":true,"relic":false,"rtxt":"1 Moonlit Soap + 1 Lapis Lazuli + 1 Fertile Catalyst → 1 Emerald"},"Turquoise":{"tier":5,"sell":290,"buy":0,"liq":false,"kind":"made","cat":"Jewelry","uses":["Mercury"],"dense":true,"relic":false,"rtxt":"2 Healing Potion + 12 Sand → 1 Turquoise"},"Pocket Watch":{"tier":6,"sell":2000,"buy":0,"liq":false,"kind":"made","cat":"Jewelry","uses":[],"dense":true,"relic":false,"rtxt":"2 Steel Gear + 2 Copper Bearing + 6 Glass → 1 Pocket Watch"},"Malachite":{"tier":6,"sell":1020,"buy":0,"liq":false,"kind":"made","cat":"Jewelry","uses":["Clockwork Bird","Mercury"],"dense":true,"relic":false,"rtxt":"4 Impure Copper Powder + 12 Clay Powder → 1 Malachite + 1 Crude Shard"},"Topaz":{"tier":7,"sell":2800,"buy":0,"liq":false,"kind":"made","cat":"Jewelry","uses":["Mercury"],"dense":false,"relic":false,"rtxt":"1 Crude Shard → 1 Topaz"},"Obsidian":{"tier":8,"sell":11000,"buy":0,"liq":false,"kind":"made","cat":"Jewelry","uses":["Mercury"],"dense":true,"relic":false,"rtxt":"4 Oblivion Essence + 2 Shattered Crystal → 1 Obsidian + 1 Marble"},"Silver Amulet":{"tier":8,"sell":51000,"buy":0,"liq":false,"kind":"made","cat":"Jewelry","uses":[],"dense":true,"relic":false,"rtxt":"2 Silver Ingot + 1 Lapis Lazuli → 1 Silver Amulet"},"Lapis Lazuli":{"tier":8,"sell":32000,"buy":0,"liq":false,"kind":"made","cat":"Jewelry","uses":["Silver Amulet","Emerald","Mercury"],"dense":true,"relic":false,"rtxt":"6 Impure Silver Powder + 6 Shattered Crystal → 2 Lapis Lazuli + 2 Shattered Crystal + 2 Crude Shard"},"Crown":{"tier":9,"sell":1700000,"buy":0,"liq":false,"kind":"made","cat":"Jewelry","uses":[],"dense":true,"relic":false,"rtxt":"3 Gold Ingot + 1 Ruby + 1 Sapphire → 1 Crown"},"Jupiter":{"tier":5,"sell":30000,"buy":0,"liq":false,"kind":"made","cat":"Relic","uses":["Star Dust","Sol"],"dense":true,"relic":true,"rtxt":"1200 Plank + 1800 Small Wooden Gear + 600 Wooden Pulley → 1 Jupiter"},"Saturn":{"tier":6,"sell":150000,"buy":0,"liq":false,"kind":"made","cat":"Relic","uses":["Star Dust","Sol"],"dense":true,"relic":true,"rtxt":"600 Salt + 600 Brick + 600 Glass → 1 Saturn"},"Mars":{"tier":6,"sell":280000,"buy":0,"liq":false,"kind":"made","cat":"Relic","uses":["Star Dust","Sol"],"dense":true,"relic":true,"rtxt":"600 Iron Nails + 300 Steel Gear + 600 Bronze Rivet + 300 Copper Bearing → 1 Mars"},"Venus":{"tier":7,"sell":1000000,"buy":0,"liq":false,"kind":"made","cat":"Relic","uses":["Sol"],"dense":true,"relic":true,"rtxt":"200 Healing Potion + 200 Vitality Potion + 200 Transformation Potion + 200 Growth Potion + 200 Blast Potion → 1 Venus"},"Mercury":{"tier":8,"sell":5200000,"buy":0,"liq":false,"kind":"made","cat":"Relic","uses":["Sol"],"dense":true,"relic":true,"rtxt":"100 Turquoise + 100 Malachite + 100 Topaz + 100 Obsidian + 100 Lapis Lazuli → 1 Mercury"},"Luna":{"tier":9,"sell":20600000,"buy":0,"liq":false,"kind":"made","cat":"Relic","uses":["Sol"],"dense":true,"relic":true,"rtxt":"75 Steel Ingot + 75 Bronze Ingot + 75 Copper Ingot + 75 Silver Ingot + 75 Gold Ingot → 1 Luna"},"Sol":{"tier":9,"sell":44500000,"buy":0,"liq":false,"kind":"made","cat":"Relic","uses":[],"dense":true,"relic":true,"rtxt":"1 Jupiter + 1 Saturn + 1 Mars + 1 Venus + 1 Mercury + 1 Luna + 25 Perfect Diamond + 5 Eternal Catalyst + 5 World Tree Core → 1 Sol"},"Gelatinous Gridlock":{"tier":1,"sell":0,"buy":100,"liq":false,"kind":"raw","cat":"Other","uses":[],"dense":false,"relic":false,"rtxt":""},"Portal Sigil":{"tier":4,"sell":0,"buy":1500,"liq":false,"kind":"raw","cat":"Other","uses":[],"dense":false,"relic":false,"rtxt":""},"Grand Portal Sigil":{"tier":5,"sell":0,"buy":16000,"liq":false,"kind":"raw","cat":"Other","uses":[],"dense":false,"relic":false,"rtxt":""},"Mortar":{"tier":2,"sell":48,"buy":0,"liq":false,"kind":"made","cat":"Other","uses":[],"dense":true,"relic":false,"rtxt":"5 Stone → 1 Mortar"},"Clockwork Bird":{"tier":6,"sell":0,"buy":0,"liq":false,"kind":"made","cat":"Other","uses":[],"dense":true,"relic":false,"rtxt":"6 Steel Ingot + 2 Steel Gear + 2 Malachite → 1 Clockwork Bird"},"Moonlit Soap":{"tier":9,"sell":995280,"buy":0,"liq":false,"kind":"made","cat":"Other","uses":["Emerald"],"dense":true,"relic":false,"rtxt":"2 Perfumed Soap Powder → 1 Moonlit Soap"}},"recipes":{"Logs":{"id":"Logs","machine":"Purchasing Portal","ins":{},"outs":{"Logs":1},"t":1,"nut":0,"shared":0,"heat":0},"Limestone":{"id":"Limestone","machine":"Purchasing Portal","ins":{},"outs":{"Limestone":1},"t":1,"nut":0,"shared":0,"heat":0},"Iron Ore":{"id":"Iron Ore","machine":"Purchasing Portal","ins":{},"outs":{"Iron Ore":1},"t":1,"nut":0,"shared":0,"heat":0},"Pyrite Ore":{"id":"Pyrite Ore","machine":"Purchasing Portal","ins":{},"outs":{"Pyrite Ore":1},"t":1,"nut":0,"shared":0,"heat":0},"Rock Salt":{"id":"Rock Salt","machine":"Purchasing Portal","ins":{},"outs":{"Rock Salt":1},"t":1,"nut":0,"shared":0,"heat":0},"Coal Ore":{"id":"Coal Ore","machine":"Purchasing Portal","ins":{},"outs":{"Coal Ore":1},"t":1,"nut":0,"shared":0,"heat":0},"Rotten Log":{"id":"Rotten Log","machine":"Purchasing Portal","ins":{},"outs":{"Rotten Log":1},"t":1,"nut":0,"shared":0,"heat":0},"Quartz Ore":{"id":"Quartz Ore","machine":"Purchasing Portal","ins":{},"outs":{"Quartz Ore":1},"t":1,"nut":0,"shared":0,"heat":0},"Meteorite":{"id":"Meteorite","machine":"Purchasing Portal","ins":{},"outs":{"Meteorite":1},"t":1,"nut":0,"shared":0,"heat":0},"Flax Seeds":{"id":"Flax Seeds","machine":"Purchasing Portal","ins":{},"outs":{"Flax Seeds":1},"t":1,"nut":0,"shared":0,"heat":0},"Sage Seeds":{"id":"Sage Seeds","machine":"Purchasing Portal","ins":{},"outs":{"Sage Seeds":1},"t":1,"nut":0,"shared":0,"heat":0},"Redcurrant Seeds":{"id":"Redcurrant Seeds","machine":"Purchasing Portal","ins":{},"outs":{"Redcurrant Seeds":1},"t":1,"nut":0,"shared":0,"heat":0},"Chamomile Seeds":{"id":"Chamomile Seeds","machine":"Purchasing Portal","ins":{},"outs":{"Chamomile Seeds":1},"t":1,"nut":0,"shared":0,"heat":0},"Lavender Seeds":{"id":"Lavender Seeds","machine":"Purchasing Portal","ins":{},"outs":{"Lavender Seeds":1},"t":1,"nut":0,"shared":0,"heat":0},"Gentian Seeds":{"id":"Gentian Seeds","machine":"Purchasing Portal","ins":{},"outs":{"Gentian Seeds":1},"t":1,"nut":0,"shared":0,"heat":0},"World Tree Seed":{"id":"World Tree Seed","machine":"Purchasing Portal","ins":{},"outs":{"World Tree Seed":1},"t":1,"nut":0,"shared":0,"heat":0},"Flax":{"id":"Flax","machine":"Nursery","ins":{},"outs":{"Flax":1},"t":0.16666666666666666,"nut":24,"shared":0,"heat":0},"Sage":{"id":"Sage","machine":"Nursery","ins":{},"outs":{"Sage":1},"t":0.25,"nut":36,"shared":0,"heat":0},"Redcurrant":{"id":"Redcurrant","machine":"Nursery","ins":{},"outs":{"Redcurrant":1},"t":1,"nut":144,"shared":0,"heat":0},"Chamomile":{"id":"Chamomile","machine":"Nursery","ins":{},"outs":{"Chamomile":1},"t":5,"nut":720,"shared":0,"heat":0},"Lavender":{"id":"Lavender","machine":"Nursery","ins":{},"outs":{"Lavender":1},"t":15,"nut":2160,"shared":0,"heat":0},"Gentian":{"id":"Gentian_Dual","machine":"Nursery","ins":{},"outs":{"Gentian":1,"Gentian Nectar":1},"t":83.33333333333333,"nut":12000,"shared":2,"heat":0},"Gentian Nectar":{"id":"Gentian_Dual","machine":"Nursery","ins":{},"outs":{"Gentian":1,"Gentian Nectar":1},"t":83.33333333333333,"nut":12000,"shared":2,"heat":0},"World Tree Leaf":{"id":"World Tree_Dual","machine":"World Tree Nursery","ins":{},"outs":{"World Tree Leaf":99,"World Tree Core":1},"t":300,"nut":5970000,"shared":0,"heat":0},"World Tree Core":{"id":"World Tree_Dual","machine":"World Tree Nursery","ins":{},"outs":{"World Tree Leaf":99,"World Tree Core":1},"t":300,"nut":5970000,"shared":0,"heat":0},"Flax Fiber":{"id":"Flax Fiber","machine":"Grinder","ins":{"Flax":1},"outs":{"Flax Fiber":1},"t":3,"nut":0,"shared":0,"heat":0},"Linen Thread":{"id":"Linen Thread","machine":"Processor","ins":{"Flax Fiber":3},"outs":{"Linen Thread":1},"t":3,"nut":0,"shared":0,"heat":0},"Linen Rope":{"id":"Linen Rope","machine":"Processor","ins":{"Linen Thread":2},"outs":{"Linen Rope":1},"t":6,"nut":0,"shared":0,"heat":0},"Linen":{"id":"Linen","machine":"Assembler","ins":{"Linen Thread":10},"outs":{"Linen":1},"t":5,"nut":0,"shared":0,"heat":0},"Bandage":{"id":"Bandage","machine":"Assembler","ins":{"Linen":1,"Healing Potion":2},"outs":{"Bandage":1},"t":10,"nut":0,"shared":0,"heat":0},"Plant Ash":{"id":"Plant Ash","machine":"Crucible","ins":{"Sage":1},"outs":{"Plant Ash":1},"t":3,"nut":0,"shared":0,"heat":4},"Sage Powder":{"id":"Sage Powder","machine":"Grinder","ins":{"Sage":1},"outs":{"Sage Powder":1},"t":3,"nut":0,"shared":0,"heat":0},"Soap":{"id":"Soap","machine":"Blender","ins":{"Plant Ash":3,"Linseed Oil":80},"outs":{"Soap":1},"t":3,"nut":0,"shared":0,"heat":0},"Soap Powder":{"id":"Soap Powder","machine":"Grinder","ins":{"Soap":1},"outs":{"Soap Powder":1},"t":6,"nut":0,"shared":0,"heat":0},"Chamomile Powder":{"id":"Chamomile Powder","machine":"Grinder","ins":{"Chamomile":1},"outs":{"Chamomile Powder":1},"t":3,"nut":0,"shared":0,"heat":0},"Perfumed Soap":{"id":"Perfumed Soap","machine":"Blender","ins":{"Soap Powder":4,"Lavender Essential Oil":30},"outs":{"Perfumed Soap":1},"t":8,"nut":0,"shared":0,"heat":0},"Perfumed Soap Powder":{"id":"Perfumed Soap Powder","machine":"Grinder","ins":{"Perfumed Soap":1},"outs":{"Perfumed Soap Powder":1},"t":8,"nut":0,"shared":0,"heat":0},"Gentian Powder":{"id":"Gentian Powder","machine":"Grinder","ins":{"Gentian":1},"outs":{"Gentian Powder":1},"t":3,"nut":0,"shared":0,"heat":0},"Charcoal":{"id":"Charcoal","machine":"Crucible","ins":{"Plank":1},"outs":{"Charcoal":1},"t":4,"nut":0,"shared":0,"heat":4},"Charcoal Powder":{"id":"Charcoal Powder","machine":"Grinder","ins":{"Charcoal":1},"outs":{"Charcoal Powder":1},"t":4,"nut":0,"shared":0,"heat":0},"Coke":{"id":"Coke","machine":"Athanor","ins":{"Charcoal Powder":12},"outs":{"Coke":1,"Charcoal":2},"t":6,"nut":0,"shared":0,"heat":32},"Coke Powder":{"id":"Coke Powder","machine":"Grinder","ins":{"Coke":1},"outs":{"Coke Powder":1},"t":12,"nut":0,"shared":0,"heat":0},"Coal":{"id":"Coal","machine":"Stone Crusher","ins":{"Coal Ore":1},"outs":{"Coal":120},"t":360,"nut":0,"shared":0,"heat":0},"Black Powder":{"id":"Black Powder","machine":"Advanced Blender","ins":{"Sulfur Powder":1,"Charcoal Powder":12,"Limewater":150},"outs":{"Black Powder":1},"t":12,"nut":0,"shared":0,"heat":0},"Basic Fertilizer":{"id":"Basic Fertilizer","machine":"Assembler","ins":{"Plant Ash":1,"Quicklime Powder":1},"outs":{"Basic Fertilizer":1},"t":4,"nut":0,"shared":0,"heat":0},"Advanced Fertilizer":{"id":"Advanced Fertilizer","machine":"Assembler","ins":{"Basic Fertilizer":1,"Gloom Fungus":1},"outs":{"Advanced Fertilizer":1},"t":4,"nut":0,"shared":0,"heat":0},"Healing Potion":{"id":"Healing Potion","machine":"Assembler","ins":{"Sage Powder":6,"Flax Fiber":6},"outs":{"Healing Potion":1},"t":6,"nut":0,"shared":0,"heat":0},"Vitality Potion":{"id":"Vitality Potion","machine":"Blender","ins":{"Quicklime Powder":4,"Fruit Wine":80},"outs":{"Vitality Potion":1},"t":8,"nut":0,"shared":0,"heat":0},"Transformation Potion":{"id":"Transformation Potion","machine":"Assembler","ins":{"Coke Powder":2,"Gloom Spores":1},"outs":{"Transformation Potion":1},"t":6,"nut":0,"shared":0,"heat":0},"Growth Potion":{"id":"Growth Potion","machine":"Advanced Blender","ins":{"Chamomile Powder":2,"Clay Powder":6,"Brine":80},"outs":{"Growth Potion":1},"t":6,"nut":0,"shared":0,"heat":0},"Blast Potion":{"id":"Blast Potion","machine":"Advanced Blender","ins":{"Oblivion Essence":1,"Black Powder":1,"Brandy":40},"outs":{"Blast Potion":1},"t":6,"nut":0,"shared":0,"heat":0},"Panacea Potion":{"id":"Panacea Potion","machine":"Advanced Blender","ins":{"Fertile Catalyst":3,"Blast Potion":3,"Aqua Vitae":12},"outs":{"Panacea Potion":1},"t":6,"nut":0,"shared":0,"heat":0},"Crude Shard":{"id":"Crude Shard","machine":"Stone Crusher","ins":{"Quartz Ore":1},"outs":{"Crude Shard":80},"t":480,"nut":0,"shared":0,"heat":0},"Broken Shard":{"id":"Broken Shard","machine":"Refiner","ins":{"Crude Shard":2},"outs":{"Broken Shard":1},"t":3,"nut":0,"shared":0,"heat":0},"Dull Shard":{"id":"Dull Shard","machine":"Refiner","ins":{"Broken Shard":2},"outs":{"Dull Shard":1},"t":3,"nut":0,"shared":0,"heat":0},"Shattered Crystal":{"id":"Shattered Crystal","machine":"Refiner","ins":{"Dull Shard":2},"outs":{"Shattered Crystal":1},"t":3,"nut":0,"shared":0,"heat":0},"Crude Crystal":{"id":"Crude Crystal","machine":"Refiner","ins":{"Shattered Crystal":2},"outs":{"Crude Crystal":1},"t":3,"nut":0,"shared":0,"heat":0},"Polished Crystal":{"id":"Polished Crystal","machine":"Refiner","ins":{"Crude Crystal":2},"outs":{"Polished Crystal":1},"t":3,"nut":0,"shared":0,"heat":0},"Adamant":{"id":"Adamant","machine":"Refiner","ins":{"Polished Crystal":2},"outs":{"Adamant":1},"t":3,"nut":0,"shared":0,"heat":0},"Diamond":{"id":"Diamond","machine":"Refiner","ins":{"Adamant":2},"outs":{"Diamond":1},"t":3,"nut":0,"shared":0,"heat":0},"Perfect Diamond":{"id":"Perfect Diamond","machine":"Refiner","ins":{"Diamond":2},"outs":{"Perfect Diamond":1},"t":3,"nut":0,"shared":0,"heat":0},"Plank":{"id":"Plank","machine":"Table Saw","ins":{"Logs":1},"outs":{"Plank":200},"t":400,"nut":0,"shared":0,"heat":0},"Large Wooden Gear":{"id":"Large Wooden Gear","machine":"Grinder","ins":{"Plank":1},"outs":{"Large Wooden Gear":1},"t":6,"nut":0,"shared":0,"heat":0},"Small Wooden Gear":{"id":"Small Wooden Gear","machine":"Processor","ins":{"Large Wooden Gear":1},"outs":{"Small Wooden Gear":3},"t":12,"nut":0,"shared":0,"heat":0},"Iron Nails":{"id":"Iron Nails","machine":"Processor","ins":{"Iron Ingot":1},"outs":{"Iron Nails":3},"t":12,"nut":0,"shared":0,"heat":0},"Stone":{"id":"Stone","machine":"Stone Crusher","ins":{"Limestone":1},"outs":{"Stone":150},"t":450,"nut":0,"shared":0,"heat":0},"Clay":{"id":"Clay","machine":"Assembler","ins":{"Charcoal Powder":2,"Sand":4},"outs":{"Clay":1},"t":4,"nut":0,"shared":0,"heat":0},"Brick":{"id":"Brick","machine":"Kiln","ins":{"Clay":1},"outs":{"Brick":1},"t":6,"nut":0,"shared":0,"heat":15},"Glass":{"id":"Glass","machine":"Kiln","ins":{"Sand":6},"outs":{"Glass":1},"t":6,"nut":0,"shared":0,"heat":15},"Wooden Pulley":{"id":"Wooden Pulley","machine":"Assembler","ins":{"Plank":2,"Linen Rope":1},"outs":{"Wooden Pulley":1},"t":4,"nut":0,"shared":0,"heat":0},"Cart":{"id":"Cart","machine":"Processor","ins":{"Iron Ingot":5},"outs":{"Cart":1},"t":30,"nut":0,"shared":0,"heat":0},"Steel Gear":{"id":"Steel Gear","machine":"Processor","ins":{"Steel Ingot":1},"outs":{"Steel Gear":1},"t":16,"nut":0,"shared":0,"heat":0},"Copper Bearing":{"id":"Copper Bearing","machine":"Processor","ins":{"Copper Ingot":1},"outs":{"Copper Bearing":2},"t":12,"nut":0,"shared":0,"heat":0},"Bronze Rivet":{"id":"Bronze Rivet","machine":"Processor","ins":{"Bronze Ingot":1},"outs":{"Bronze Rivet":3},"t":12,"nut":0,"shared":0,"heat":0},"Marble":{"id":"Obsidian","machine":"Advanced Athanor","ins":{"Oblivion Essence":4,"Shattered Crystal":2},"outs":{"Obsidian":1,"Marble":1},"t":12,"nut":0,"shared":0,"heat":360},"Iron Ingot":{"id":"Iron Ingot","machine":"Iron Smelter","ins":{"Iron Ore":1},"outs":{"Iron Ingot":100},"t":600,"nut":0,"shared":0,"heat":9},"Steel Ingot":{"id":"Steel Ingot","machine":"Athanor","ins":{"Iron Ingot":4,"Coke Powder":4},"outs":{"Steel Ingot":1,"Iron Ingot":3},"t":16,"nut":0,"shared":0,"heat":32},"Bronze Ingot":{"id":"Bronze Ingot","machine":"Crucible","ins":{"Impure Copper Powder":1},"outs":{"Bronze Ingot":1},"t":12,"nut":0,"shared":0,"heat":4},"Copper Ingot":{"id":"Copper Ingot","machine":"Crucible","ins":{"Copper Powder":1},"outs":{"Copper Ingot":1},"t":12,"nut":0,"shared":0,"heat":4},"Silver Ingot":{"id":"Silver Ingot","machine":"Crucible","ins":{"Silver Powder":1},"outs":{"Silver Ingot":1},"t":16,"nut":0,"shared":0,"heat":4},"Gold Ingot":{"id":"Gold Ingot","machine":"Crucible","ins":{"Pure Gold Dust":1},"outs":{"Gold Ingot":1},"t":40,"nut":0,"shared":0,"heat":4},"Iron Sand":{"id":"Iron Sand","machine":"Grinder","ins":{"Iron Ingot":1},"outs":{"Iron Sand":1},"t":30,"nut":0,"shared":0,"heat":0},"Impure Copper Powder":{"id":"Copper Powder","machine":"Athanor","ins":{"Iron Sand":12,"Soap Powder":12},"outs":{"Copper Powder":1,"Impure Copper Powder":1},"t":12,"nut":0,"shared":0,"heat":32},"Copper Powder":{"id":"Copper Powder","machine":"Athanor","ins":{"Iron Sand":12,"Soap Powder":12},"outs":{"Copper Powder":1,"Impure Copper Powder":1},"t":12,"nut":0,"shared":0,"heat":32},"Crude Silver Powder":{"id":"Silver Powder","machine":"Advanced Athanor","ins":{"Copper Powder":40,"Black Powder":20},"outs":{"Silver Powder":2,"Crude Silver Powder":8},"t":64,"nut":0,"shared":0,"heat":360},"Impure Silver Powder":{"id":"Impure Silver Powder","machine":"Refiner","ins":{"Crude Silver Powder":2},"outs":{"Impure Silver Powder":1},"t":8,"nut":0,"shared":0,"heat":0},"Silver Powder":{"id":"Silver Powder","machine":"Advanced Athanor","ins":{"Copper Powder":40,"Black Powder":20},"outs":{"Silver Powder":2,"Crude Silver Powder":8},"t":64,"nut":0,"shared":0,"heat":360},"Crude Gold Dust":{"id":"Gold Dust","machine":"Advanced Athanor","ins":{"Silver Powder":10,"Volcanic Ash":10,"Quicksilver":180},"outs":{"Gold Dust":1,"Impure Gold Dust":3,"Crude Gold Dust":6},"t":80,"nut":0,"shared":0,"heat":360},"Impure Gold Dust":{"id":"Impure Gold Dust","machine":"Refiner","ins":{"Crude Gold Dust":2},"outs":{"Impure Gold Dust":1},"t":10,"nut":0,"shared":0,"heat":0},"Gold Dust":{"id":"Gold Dust","machine":"Advanced Athanor","ins":{"Silver Powder":10,"Volcanic Ash":10,"Quicksilver":180},"outs":{"Gold Dust":1,"Impure Gold Dust":3,"Crude Gold Dust":6},"t":80,"nut":0,"shared":0,"heat":360},"Pure Gold Dust":{"id":"Pure Gold Dust","machine":"Refiner","ins":{"Gold Dust":2},"outs":{"Pure Gold Dust":1},"t":10,"nut":0,"shared":0,"heat":0},"Linseed Oil":{"id":"Linseed Oil","machine":"Extractor","ins":{"Flax":1},"outs":{"Linseed Oil":20},"t":2,"nut":0,"shared":0,"heat":0},"Fruit Wine":{"id":"Fruit Wine","machine":"Extractor","ins":{"Redcurrant":1},"outs":{"Fruit Wine":10},"t":6,"nut":0,"shared":0,"heat":0},"Limewater":{"id":"Limewater","machine":"Extractor","ins":{"Quicklime Powder":1},"outs":{"Limewater":30},"t":3,"nut":0,"shared":0,"heat":0},"Brine":{"id":"Brine","machine":"Extractor","ins":{"Salt":1},"outs":{"Brine":20},"t":4,"nut":0,"shared":0,"heat":0},"Lavender Essential Oil":{"id":"Lavender Essential Oil","machine":"Alembic","ins":{"Lavender":3,"Linseed Oil":120},"outs":{"Lavender Essential Oil":15},"t":3,"nut":0,"shared":0,"heat":108},"Brandy":{"id":"Brandy","machine":"Alembic","ins":{"Coke Powder":5,"Fruit Wine":100},"outs":{"Brandy":40},"t":5,"nut":0,"shared":0,"heat":108},"Sulfuric Acid":{"id":"Sulfuric Acid","machine":"Alembic","ins":{"Sulfur Powder":1,"Brine":60},"outs":{"Sulfuric Acid":20},"t":4,"nut":0,"shared":0,"heat":108},"Quicksilver":{"id":"Quicksilver","machine":"Advanced Alembic","ins":{"Crude Silver Powder":1,"Vitality Essence":1,"Sulfuric Acid":80},"outs":{"Quicksilver":10},"t":8,"nut":0,"shared":0,"heat":270},"Aqua Vitae":{"id":"Aqua Vitae","machine":"Advanced Alembic","ins":{"Gentian Nectar":1,"World Tree Leaf":1,"Brandy":200},"outs":{"Aqua Vitae":10},"t":8,"nut":0,"shared":0,"heat":270},"Fairy Tear":{"id":"Fairy Tear","machine":"Extractor","ins":{"Fairy Dust":1},"outs":{"Fairy Tear":1},"t":4,"nut":0,"shared":0,"heat":0},"Moon Tear":{"id":"Moon Tear","machine":"Advanced Alembic","ins":{"Star Dust":1,"Fairy Tear":18},"outs":{"Moon Tear":1},"t":8,"nut":0,"shared":0,"heat":270},"Sand":{"id":"Sand","machine":"Grinder","ins":{"Stone":1},"outs":{"Sand":1},"t":12,"nut":0,"shared":0,"heat":0},"Quicklime":{"id":"Quicklime","machine":"Crucible","ins":{"Stone":1},"outs":{"Quicklime":1},"t":9,"nut":0,"shared":0,"heat":4},"Quicklime Powder":{"id":"Quicklime Powder","machine":"Grinder","ins":{"Quicklime":1},"outs":{"Quicklime Powder":1},"t":9,"nut":0,"shared":0,"heat":0},"Clay Powder":{"id":"Clay Powder","machine":"Grinder","ins":{"Clay":1},"outs":{"Clay Powder":1},"t":4,"nut":0,"shared":0,"heat":0},"Yeast Powder":{"id":"Yeast Powder","machine":"Blender","ins":{"Soap Powder":2,"Fruit Wine":40},"outs":{"Yeast Powder":1},"t":4,"nut":0,"shared":0,"heat":0},"Gloom Fungus":{"id":"Gloom Fungus","machine":"Table Saw","ins":{"Rotten Log":1},"outs":{"Gloom Fungus":40,"Plank":160},"t":400,"nut":0,"shared":0,"heat":0},"Gloom Spores":{"id":"Gloom Spores","machine":"Assembler","ins":{"Gloom Fungus":2,"Yeast Powder":1},"outs":{"Gloom Spores":1},"t":4,"nut":0,"shared":0,"heat":0},"Salt":{"id":"Salt","machine":"Athanor","ins":{"Charcoal Powder":6,"Quicklime Powder":12},"outs":{"Salt":1,"Sand":12},"t":18,"nut":0,"shared":0,"heat":32},"Sulfur":{"id":"Sulfur","machine":"Iron Smelter","ins":{"Pyrite Ore":1},"outs":{"Sulfur":40,"Iron Ingot":120},"t":960,"nut":0,"shared":0,"heat":9},"Sulfur Powder":{"id":"Sulfur Powder","machine":"Grinder","ins":{"Sulfur":1},"outs":{"Sulfur Powder":1},"t":6,"nut":0,"shared":0,"heat":0},"Unstable Catalyst":{"id":"Unstable Catalyst","machine":"Assembler","ins":{"Chamomile Powder":2,"Gloom Spores":2},"outs":{"Unstable Catalyst":1},"t":4,"nut":0,"shared":0,"heat":0},"Fertile Catalyst":{"id":"Fertile Catalyst","machine":"Advanced Blender","ins":{"Unstable Catalyst":1,"Vitality Essence":1,"Lavender Essential Oil":18},"outs":{"Fertile Catalyst":1},"t":8,"nut":0,"shared":0,"heat":0},"Resonant Catalyst":{"id":"Resonant Catalyst","machine":"Advanced Blender","ins":{"Fertile Catalyst":1,"Volcanic Ash":1,"Aqua Vitae":12},"outs":{"Resonant Catalyst":1},"t":8,"nut":0,"shared":0,"heat":0},"Eternal Catalyst":{"id":"Eternal Catalyst","machine":"Arcane Processor","ins":{"Resonant Catalyst":15,"Philosopherˈs Stone":1},"outs":{"Eternal Catalyst":1},"t":60,"nut":0,"shared":0,"heat":0},"Philosopherˈs Stone":{"id":"Philosopherˈs Stone","machine":"Cauldron","ins":{"Ruby":1,"Sapphire":1,"Emerald":1},"outs":{"Philosopherˈs Stone":1},"t":60,"nut":0,"shared":0,"heat":10000},"Oblivion Essence":{"id":"Oblivion Essence (Limestone)","machine":"Paradox Crucible","ins":{"Limestone":1},"outs":{"Oblivion Essence":1},"t":3.333,"nut":0,"shared":0,"heat":1200},"Vitality Essence":{"id":"Vitality Essence","machine":"Paradox Crucible","ins":{"Oblivion Essence":1},"outs":{"Vitality Essence":1},"t":5,"nut":0,"shared":0,"heat":1200},"Star Dust":{"id":"Star Dust","machine":"Arcane Processor","ins":{"Jupiter":1,"Saturn":1,"Mars":1},"outs":{"Star Dust":5},"t":300,"nut":0,"shared":0,"heat":0},"Fairy Dust":{"id":"Fairy Dust","machine":"Arcane Processor","ins":{"Chamomile Powder":1,"Gentian Powder":1,"World Tree Leaf":1},"outs":{"Fairy Dust":1},"t":4,"nut":0,"shared":0,"heat":0},"Ruby":{"id":"Ruby","machine":"Cauldron","ins":{"Diamond":1,"Gold Dust":1,"Resonant Catalyst":1},"outs":{"Ruby":1},"t":30.9,"nut":0,"shared":0,"heat":3131.3},"Sapphire":{"id":"Sapphire","machine":"Cauldron","ins":{"Perfect Diamond":1,"World Tree Core":1,"Unstable Catalyst":1},"outs":{"Sapphire":1},"t":38.2,"nut":0,"shared":0,"heat":4848.5},"Emerald":{"id":"Emerald","machine":"Cauldron","ins":{"Moonlit Soap":1,"Lapis Lazuli":1,"Fertile Catalyst":1},"outs":{"Emerald":1},"t":45.5,"nut":0,"shared":0,"heat":6565.7},"Turquoise":{"id":"Turquoise","machine":"Assembler","ins":{"Healing Potion":2,"Sand":12},"outs":{"Turquoise":1},"t":12,"nut":0,"shared":0,"heat":0},"Pocket Watch":{"id":"Pocket Watch","machine":"Advanced Assembler","ins":{"Steel Gear":2,"Copper Bearing":2,"Glass":6},"outs":{"Pocket Watch":1},"t":12,"nut":0,"shared":0,"heat":0},"Malachite":{"id":"Malachite","machine":"Athanor","ins":{"Impure Copper Powder":4,"Clay Powder":12},"outs":{"Malachite":1,"Crude Shard":1},"t":24,"nut":0,"shared":0,"heat":32},"Topaz":{"id":"Topaz","machine":"Blender","ins":{"Crude Shard":1,"Sulfuric Acid":30},"outs":{"Topaz":1},"t":12,"nut":0,"shared":0,"heat":0},"Obsidian":{"id":"Obsidian","machine":"Advanced Athanor","ins":{"Oblivion Essence":4,"Shattered Crystal":2},"outs":{"Obsidian":1,"Marble":1},"t":12,"nut":0,"shared":0,"heat":360},"Silver Amulet":{"id":"Silver Amulet","machine":"Assembler","ins":{"Silver Ingot":2,"Lapis Lazuli":1},"outs":{"Silver Amulet":1},"t":10,"nut":0,"shared":0,"heat":0},"Lapis Lazuli":{"id":"Lapis Lazuli","machine":"Advanced Athanor","ins":{"Impure Silver Powder":6,"Shattered Crystal":6},"outs":{"Lapis Lazuli":2,"Shattered Crystal":2,"Crude Shard":2},"t":72,"nut":0,"shared":0,"heat":360},"Crown":{"id":"Crown","machine":"Advanced Assembler","ins":{"Gold Ingot":3,"Ruby":1,"Sapphire":1},"outs":{"Crown":1},"t":15,"nut":0,"shared":0,"heat":0},"Jupiter":{"id":"Jupiter","machine":"Shaper","ins":{"Plank":1200,"Small Wooden Gear":1800,"Wooden Pulley":600},"outs":{"Jupiter":1},"t":600,"nut":0,"shared":0,"heat":0},"Saturn":{"id":"Saturn","machine":"Shaper","ins":{"Salt":600,"Brick":600,"Glass":600},"outs":{"Saturn":1},"t":300,"nut":0,"shared":0,"heat":0},"Mars":{"id":"Mars","machine":"Shaper","ins":{"Iron Nails":600,"Steel Gear":300,"Bronze Rivet":600,"Copper Bearing":300},"outs":{"Mars":1},"t":300,"nut":0,"shared":0,"heat":0},"Venus":{"id":"Venus","machine":"Advanced Shaper","ins":{"Healing Potion":200,"Vitality Potion":200,"Transformation Potion":200,"Growth Potion":200,"Blast Potion":200,"Sulfuric Acid":4000},"outs":{"Venus":1},"t":1200,"nut":0,"shared":0,"heat":0},"Mercury":{"id":"Mercury","machine":"Advanced Shaper","ins":{"Turquoise":100,"Malachite":100,"Topaz":100,"Obsidian":100,"Lapis Lazuli":100,"Quicksilver":1000},"outs":{"Mercury":1},"t":600,"nut":0,"shared":0,"heat":0},"Luna":{"id":"Luna","machine":"Advanced Shaper","ins":{"Steel Ingot":75,"Bronze Ingot":75,"Copper Ingot":75,"Silver Ingot":75,"Gold Ingot":75,"Moon Tear":75},"outs":{"Luna":1},"t":600,"nut":0,"shared":0,"heat":0},"Sol":{"id":"Sol","machine":"Arcane Shaper","ins":{"Jupiter":1,"Saturn":1,"Mars":1,"Venus":1,"Mercury":1,"Luna":1,"Perfect Diamond":25,"Eternal Catalyst":5,"World Tree Core":5},"outs":{"Sol":1},"t":300,"nut":0,"shared":0,"heat":0},"Gelatinous Gridlock":{"id":"Gelatinous Gridlock","machine":"Purchasing Portal","ins":{},"outs":{"Gelatinous Gridlock":1},"t":1,"nut":0,"shared":0,"heat":0},"Portal Sigil":{"id":"Portal Sigil","machine":"Purchasing Portal","ins":{},"outs":{"Portal Sigil":1},"t":1,"nut":0,"shared":0,"heat":0},"Grand Portal Sigil":{"id":"Grand Portal Sigil","machine":"Purchasing Portal","ins":{},"outs":{"Grand Portal Sigil":1},"t":1,"nut":0,"shared":0,"heat":0},"Mortar":{"id":"Mortar","machine":"Processor","ins":{"Stone":5},"outs":{"Mortar":1},"t":20,"nut":0,"shared":0,"heat":0},"Clockwork Bird":{"id":"Clockwork Bird","machine":"Advanced Assembler","ins":{"Steel Ingot":6,"Steel Gear":2,"Malachite":2},"outs":{"Clockwork Bird":1},"t":12,"nut":0,"shared":0,"heat":0},"Moonlit Soap":{"id":"Moonlit Soap","machine":"Advanced Blender","ins":{"Perfumed Soap Powder":2,"Moon Tear":5},"outs":{"Moonlit Soap":1},"t":10,"nut":0,"shared":0,"heat":0}},"machines":{"Purchasing Portal":{"v":12,"slots":0,"L":3,"W":2,"H":2},"Nursery":{"v":36,"slots":0,"L":3,"W":3,"H":4},"World Tree Nursery":{"v":810,"slots":0,"L":9,"W":9,"H":10},"Grinder":{"v":1,"slots":0,"L":1,"W":1,"H":1},"Processor":{"v":8,"slots":0,"L":2,"W":2,"H":2},"Assembler":{"v":12,"slots":0,"L":2,"W":2,"H":3},"Crucible":{"v":4,"slots":3,"L":2,"W":2,"H":1},"Blender":{"v":4,"slots":0,"L":2,"W":1,"H":2},"Athanor":{"v":12,"slots":6,"L":2,"W":2,"H":3},"Stone Crusher":{"v":36,"slots":0,"L":4,"W":3,"H":3},"Advanced Blender":{"v":12,"slots":0,"L":2,"W":2,"H":3},"Refiner":{"v":4,"slots":0,"L":2,"W":2,"H":1},"Table Saw":{"v":36,"slots":0,"L":4,"W":3,"H":3},"Kiln":{"v":27,"slots":6,"L":3,"W":3,"H":3},"Advanced Athanor":{"v":36,"slots":9,"L":3,"W":3,"H":4},"Iron Smelter":{"v":27,"slots":9,"L":3,"W":3,"H":3},"Extractor":{"v":2,"slots":0,"L":1,"W":1,"H":2},"Alembic":{"v":6,"slots":3,"L":2,"W":1,"H":3},"Advanced Alembic":{"v":12,"slots":6,"L":2,"W":2,"H":3},"Arcane Processor":{"v":810,"slots":0,"L":9,"W":9,"H":10},"Cauldron":{"v":18,"slots":0,"L":3,"W":3,"H":2},"Paradox Crucible":{"v":27,"slots":9,"L":3,"W":3,"H":3},"Advanced Assembler":{"v":36,"slots":0,"L":3,"W":3,"H":4},"Shaper":{"v":36,"slots":0,"L":3,"W":3,"H":4},"Advanced Shaper":{"v":36,"slots":0,"L":3,"W":3,"H":4},"Arcane Shaper":{"v":150,"slots":0,"L":5,"W":5,"H":6}},"version":"1.0.4952","dataDate":"2026.09.30"};
+// Pure calculation core. No DOM. Used by the page and by the node regression test.
+function makeCore(DATA){
+  const I=DATA.items, R=DATA.recipes, M=DATA.machines;
+  const BELT=60, FUEL_HEAT=660, FERT_VALUE=720, LO=2.4, HI=2.8;
+  const isLiq=n=>!!(I[n]&&I[n].liq);
+  const kind=n=>I[n]?I[n].kind:'none';
+  // items per minute of `item` from ONE machine. Every machine is capped at one belt of output.
+  function rate(r,item){ let per=60/r.t*r.outs[item], capped=false;
+    if(!isLiq(item)){ let belt=BELT; if(r.shared) belt/=r.shared; if(per>belt+1e-9){ per=belt; capped=true; } }
+    return {per,capped}; }
+  // cuts: Set of item names taken off the bus instead of made in this module
+  function solve(root,outRate,cuts){
+    let byp={}, res=null;
+    for(let it=0;it<80;it++){
+      const mach={}, busIn={}, coins={}, flows={}, nb={}; let fert=0;
+      const expand=(n,q,d)=>{ if(d>60) return;
+        if(n!==root && cuts.has(n)){ busIn[n]=(busIn[n]||0)+q; return; }
+        const r=R[n]; if(!r){ busIn[n]=(busIn[n]||0)+q; return; }
+        flows[n]=(flows[n]||0)+q;
+        if(kind(n)==='raw'){ coins[n]=(coins[n]||0)+q; return; }
+        const share=(byp[n]||0)*(q/(flows[n]||q)); const net=Math.max(0,q-share);
+        const machines=net/rate(r,n).per, crafts=net/r.outs[n];
+        mach[n]=(mach[n]||0)+machines;
+        if(r.nut) fert+=crafts*r.nut/FERT_VALUE;
+        for(const o in r.outs) if(o!==n) nb[o]=(nb[o]||0)+crafts*r.outs[o];
+        for(const i in r.ins) expand(i,crafts*r.ins[i],d+1);
+      };
+      expand(root,outRate,0);
+      const nbyp={}; for(const o in nb) if(flows[o]) nbyp[o]=Math.min(nb[o],flows[o]);
+      const spare={}; for(const o in nb){ const used=Math.min(nb[o],flows[o]||0); if(nb[o]-used>1e-9) spare[o]=nb[o]-used; }
+      res={mach,busIn,coins,fert,spare,flows,recycled:nbyp};
+      let diff=0; const keys=new Set([...Object.keys(nbyp),...Object.keys(byp)]); for(const k of keys) diff+=Math.abs((nbyp[k]||0)-(byp[k]||0));
+      byp=nbyp; if(diff<1e-9) break;
+    }
+    let hps=0; const list=[];
+    for(const n in res.mach){ const r=R[n], c=res.mach[n]; hps+=c*(r.heat||0);
+      list.push({item:n, machine:r.machine, out:Object.keys(r.outs).join(' + '), each:rate(r,n).per, capped:rate(r,n).capped, count:c, heat:(r.heat||0)>0}); }
+    list.sort((a,b)=>b.count-a.count);
+    let copper=0; for(const n in res.coins) copper+=res.coins[n]*(I[n].buy||0);
+    return {root,list,busIn:res.busIn,coins:res.coins,copper,fert:res.fert,spare:res.spare,flows:res.flows,recycled:res.recycled,hps};
+  }
+  function volume(sol,scale){ let v=0,furn=0,miss=false; const k=scale||1;
+    for(const m of sol.list){ const n=Math.ceil(m.count*k-1e-9); if(!n) continue; const d=M[m.machine];
+      if(!d||!d.v){ miss=true; v+=8*n; continue; } v+=d.v*n; if(d.slots) furn+=Math.ceil(n/Math.max(1,Math.floor(9/d.slots))); }
+    v+=furn*27; return {v,furn,miss}; }
+  function fuelPerMin(sol,fe){ return sol.hps*60/(FUEL_HEAT*(1+0.1*fe)); }
+  // smallest output where every machine count is whole (nurseries and single machines may round up)
+  function cleanRate(root,cuts){ const r=R[root]; const unit=rate(r,root).per; const s=solve(root,unit,cuts);
+    for(let k=1;k<=300;k++){ if(s.list.every(m=>{ const n=m.count*k; if(m.machine==='Nursery'||n<=1+1e-9) return true; return Math.abs(n-Math.round(n))<0.02; })) return unit*k; }
+    return unit; }
+  // The bus line. An item goes on the bus only when a module that needs it cannot fit making it inside one tile.
+  // When a module is too big, take off the bus whichever ingredient removes the most machinery per item moved; repeat.
+  const UNIVERSAL=['Coke Powder','Advanced Fertilizer'];
+  // A simple conversion: one unheated machine turning one ingredient into the same number of this item (steel ingot -> steel gear).
+  // Returns the ingredient's name, or null. These get converted on site; it's the ingredient that rides the bus.
+  function simpleFrom(n){ const r=R[n]; if(!r||!I[n]||I[n].kind!=='made'||I[n].liq||r.heat) return null;
+    const ins=Object.keys(r.ins).filter(k=>!isLiq(k)), outs=Object.keys(r.outs).filter(k=>!isLiq(k));
+    if(Object.keys(r.ins).length!==1||ins.length!==1||outs.length!==1) return null; const i=ins[0];
+    if(!I[i]||I[i].kind!=='made'||r.ins[i]!==r.outs[n]) return null; return i; }
+  function busLine(maxTier,cap){
+    const made=Object.keys(I).filter(n=>I[n].kind==='made'&&!I[n].liq&&I[n].tier<=maxTier).sort((a,b)=>I[a].tier-I[b].tier||a.localeCompare(b));
+    const B=new Set(UNIVERSAL), forcedBy={};
+    const fits=sol=>volume(sol).v*HI<=cap;
+    const plan=x=>{ const one=rate(R[x],x).per; const cuts=new Set(B); cuts.delete(x); let sol=solve(x,one,cuts), guard=0;
+      while(!fits(sol)&&guard++<15){ const v0=volume(sol).v; let best=null;
+        for(const c in sol.flows){ if(c===x||I[c].kind!=='made'||I[c].liq||cuts.has(c)) continue;
+          const t=new Set(cuts); t.add(c); const sc=solve(x,one,t); const flow=sc.busIn[c]||0; if(flow<=0) continue;
+          const gain=(v0-volume(sc).v)/flow; if(!best||gain>best.gain) best={c,gain,sc}; }
+        if(!best||best.gain<=0) break;
+        let c=best.c, src; while(!UNIVERSAL.includes(c)&&(src=simpleFrom(c))&&src!==x) c=src;
+        cuts.add(c); sol=(c===best.c)?best.sc:solve(x,one,cuts); B.add(c); (forcedBy[c]=forcedBy[c]||[]).push(x); } };
+    for(let pass=0;pass<4;pass++){ const before=B.size; for(const x of made) plan(x); if(pass>0&&B.size===before) break; }
+    for(const k in forcedBy) forcedBy[k]=[...new Set(forcedBy[k])];
+    return {bus:B,forcedBy};
+  }
+  return {I,R,M,BELT,LO,HI,UNIVERSAL,isLiq,kind,rate,solve,volume,fuelPerMin,cleanRate,busLine,simpleFrom};
+}
+
+// Page logic. Expects DATA and makeCore() to be defined above it.
+const C=makeCore(DATA), I=C.I, R=C.R;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function fmt(x){ if(!isFinite(x)) return "—"; if(Math.abs(x)<1e-9) return "0"; const a=Math.abs(x); if(a>=1000) return Math.round(x).toLocaleString(); if(a>=100) return x.toFixed(0); if(a>=10) return (+x.toFixed(1)).toString(); return (+x.toFixed(2)).toString(); }
+const plural=(n,w)=>n+" "+(n===1?w:(/y$/.test(w)?w.slice(0,-1)+"ies":(/s$/.test(w)?w:w+"s")));
+const listAnd=a=>a.length<=1?a.join(""):a.length===2?a.join(" and "):a.slice(0,-1).join(", ")+" and "+a[a.length-1];
+const DEFAULT_RATE={"Coke Powder":45,"Advanced Fertilizer":60,"Glass":60};
+$("ver").textContent="game "+DATA.version;
+
+// ---------- settings ----------
+const maxTier=Math.max(...Object.values(I).map(i=>i.tier));
+for(let t=1;t<=maxTier;t++){ const o=document.createElement("option"); o.value=t; o.textContent=t; $("tier").appendChild(o); }
+$("tier").value=maxTier;
+// your settings are remembered in this browser
+const SET_IDS=["tier","fe","mL","mW","mH","connmax"];
+try{ const sv=JSON.parse(localStorage.getItem("bsp_settings")||"{}")||{}; for(const id of SET_IDS){ const v=+sv[id]; if(sv[id]!=null&&sv[id]!==""&&isFinite(v)&&v>=0&&(id!=="tier"||(v>=1&&v<=maxTier))) $(id).value=sv[id]; } }catch(e){}
+const saveSettings=()=>{ try{ const o={}; for(const id of SET_IDS) o[id]=$(id).value; localStorage.setItem("bsp_settings",JSON.stringify(o)); }catch(e){} };
+const num=(id,def,min)=>Math.max(min,+$(id).value||def);
+const cap=()=>num("mL",14,1)*num("mW",14,1)*num("mH",15,1);
+const dimTxt=()=>num("mL",14,1)+"×"+num("mW",14,1)+"×"+num("mH",15,1);
+const tierMax=()=>+$("tier").value;
+const fe=()=>Math.max(0,+$("fe").value||0);
+const inTier=n=>I[n]&&I[n].tier<=tierMax();
+
+// ---------- your own decisions: one per item, applied to every module (kept in this browser only) ----------
+let choice={};
+try{ choice=JSON.parse(localStorage.getItem("bsp_choice")||"{}")||{}; }catch(e){ choice={}; }
+const saveChoice=()=>{ try{ localStorage.setItem("bsp_choice",JSON.stringify(choice)); }catch(e){} };
+function decide(item,to){ if(to===null) delete choice[item]; else choice[item]=to; saveChoice(); redrawAll(); }
+
+// ---------- the bus line for the current tier and tile size ----------
+let LINE=null, lineKey="";
+function line(){ const k=tierMax()+"|"+cap(); if(k!==lineKey){ LINE=C.busLine(tierMax(),cap()); lineKey=k; } return LINE; }
+// Where an item stands. code: ded (own wagon type), mix (shared research wagon), maybe, no
+function status(n){
+  const it=I[n], L=line(); const users=it.uses.filter(inTier); const made=it.kind==="made"&&!it.liq;
+  const usesTxt=listAnd(users.slice(0,4))+(users.length>4?" and others":"");
+  if(choice[n]==="bus") return {code:"ded",mine:true,why:"Your choice. Every module that needs it takes it off the bus."};
+  if(choice[n]==="off") return {code:"no",mine:true,why:"Your choice. Every module that needs it makes its own."+(L.bus.has(n)&&!C.UNIVERSAL.includes(n)?" Check those modules still fit: the "+listAnd((L.forcedBy[n]||[]).slice(0,3))+" module didn't have room for it.":"")};
+  if(n==="Coke Powder") return {code:"ded",why:"Always. It's the fuel for every heated machine, and an ingredient in steel and some potions."};
+  if(n==="Advanced Fertilizer") return {code:"ded",why:"Always. Every nursery in the base runs on it."};
+  if(it.relic) return {code:"mix",why:"A relic. It only goes to the shop and to research, so it rides one shared \"research\" wagon type with the other relics."+(users.length?" "+usesTxt+" also take"+(users.length>1?"":"s")+" it off that wagon.":"")};
+  if(L.bus.has(n)){ const fb=L.forcedBy[n]||[]; return {code:"ded",why:"The "+listAnd(fb.slice(0,3))+" module"+(fb.length>1?"s":"")+" can't fit making "+(fb.length>1?"their":"its")+" own "+n.toLowerCase()+" in one tile."}; }
+  if(it.liq) return {code:"no",why:"Hard no. A liquid, piped inside whatever uses it."};
+  if(it.kind==="raw") return {code:"no",why:"Hard no. Bought with coins inside whatever uses it."};
+  if(it.kind==="crop") return {code:"no",why:"Hard no. Grown in nurseries inside whatever uses it."};
+  { const src=C.simpleFrom(n); if(src&&inTier(src)){ if(onBus(src)) return {code:"no",why:"No. It's a straight one-for-one conversion of "+src+" in a single "+R[n].machine+". "+src+" is what rides the bus, and you convert it right where it's needed"+(it.sell?", including next to the shop":"")+"."};
+      return {code:"no",why:"No. It's a straight one-for-one conversion of "+src+" in a single "+R[n].machine+". Whatever module needs it grinds its own from the "+src.toLowerCase()+" it already has"+(it.sell?". The shop's share gets made next to the shop.":".")}; } }
+  if(!it.dense) return {code:"no",why:"Hard no. Bulk ("+it.rtxt+"). Make it right where it's used."+(it.sell?" The shop's share gets made next to the shop.":"")};
+  if(users.length) return {code:"maybe",why:"Packed down ("+it.rtxt+"), but "+(users.length<=2?"only ":"just ")+usesTxt+" use"+(users.length>1?"":"s")+" it"+(it.sell?", plus the shop":"")+". Bus it from its own module, or build it into the "+usesTxt+" module"+(users.length>1?"s":"")+(it.sell?" and make the shop's share next to the shop":"")+". Fits either way."};
+  if(it.sell) return {code:"no",why:"Only sold. Make it next to the shop."};
+  return {code:"no",why:"Nothing at this tier uses it."};
+}
+const onBus=n=>{ const c=status(n).code; return c==="ded"||c==="mix"; };
+function cutsFor(root){ const s=new Set(); for(const n in I) if(n!==root&&inTier(n)&&I[n].kind==="made"&&!I[n].liq&&onBus(n)) s.add(n); for(const u of C.UNIVERSAL) if(u!==root) s.add(u); return s; }
+let cutCache={}, cutKey="";
+function cuts(root){ const k=lineKey+"|"+JSON.stringify(choice); if(k!==cutKey){ cutCache={}; cutKey=k; } return cutCache[root]||(cutCache[root]=cutsFor(root)); }
+const verdict=(lo,hi)=>hi<=100?["ok","Fits"]:(lo<=100?["edge","Tight squeeze"]:["over","Too big"]);
+const SLABEL={ded:"Yes · own wagons",mix:"Yes · shared wagon",maybe:"Maybe",no:"No"};
+const SORD={ded:0,mix:1,maybe:2,no:3};
+
+// ---------- tab 1: what goes on the bus ----------
+const flt={ded:true,mix:true,maybe:true,no:true,sold:false,basic:true};
+function tog(id,key){ const b=$(id); b.setAttribute("aria-pressed",flt[key]); b.onclick=()=>{ flt[key]=!flt[key]; b.setAttribute("aria-pressed",flt[key]); renderItems(); }; }
+tog("f-ded","ded"); tog("f-mix","mix"); tog("f-maybe","maybe"); tog("f-no","no"); tog("f-sold","sold"); tog("f-basic","basic");
+let sortK="bus", sortDir=1;
+function itemRow(n){
+  const it=I[n]; const made=it.kind==="made"&&!it.liq; const st=status(n); const users=it.uses.filter(inTier);
+  return {n,it,st,users,made};
+}
+const KEY={item:r=>r.n,bus:r=>SORD[r.st.code],why:r=>r.st.why,used:r=>r.users.join(", ")||"~",sell:r=>r.it.sell||0,tier:r=>r.it.tier};
+$("sorthead").addEventListener("click",e=>{ const b=e.target.closest(".sortb"); if(!b) return; const k=b.dataset.k; if(sortK===k) sortDir=-sortDir; else{ sortK=k; sortDir=1; } renderItems(); });
+function renderItems(){
+  document.querySelectorAll(".sortb").forEach(x=>{ const on=x.dataset.k===sortK; x.dataset.dir=on?(sortDir>0?"asc":"desc"):""; });
+  const q=$("q").value.trim().toLowerCase();
+  let rows=Object.keys(I).filter(inTier).map(itemRow);
+  rows=rows.filter(r=>flt[r.st.code]&&(!flt.sold||r.it.sell)&&(!flt.basic||r.made)&&(!q||r.n.toLowerCase().includes(q)||r.users.some(u=>u.toLowerCase().includes(q))));
+  rows.sort((a,b)=>{ const ka=KEY[sortK](a), kb=KEY[sortK](b); let c=typeof ka==="number"?ka-kb:String(ka).localeCompare(String(kb)); if(!c) c=a.it.tier-b.it.tier||a.n.localeCompare(b.n); return c*sortDir; });
+  const cnt={ded:0,mix:0,maybe:0,no:0}; rows.forEach(r=>cnt[r.st.code]++);
+  $("count").textContent=rows.length+" shown: "+cnt.ded+" own wagons, "+cnt.mix+" shared wagon, "+cnt.maybe+" maybe, "+cnt.no+" no";
+  $("rows").innerHTML=rows.map(r=>{
+    const name=r.made?`<button class="link" data-mod="${esc(r.n)}">${esc(r.n)}</button>`:`<span class="name">${esc(r.n)}</span>`;
+    const used=[...r.users.map(u=>`<span class="chip">${esc(u)}</span>`), r.it.relic?`<span class="chip resc">Research</span>`:"", r.it.sell?`<span class="chip shopc">Shop</span>`:""].join("")||"—";
+    let act="";
+    if(r.made&&!C.UNIVERSAL.includes(r.n)){
+      if(r.st.mine) act=`<button class="swap" data-item="${esc(r.n)}" data-to="">Undo my choice</button>`;
+      else if(r.st.code==="ded"||r.st.code==="mix") act=`<button class="swap" data-item="${esc(r.n)}" data-to="off">Keep it off the bus</button>`;
+      else act=`<button class="swap" data-item="${esc(r.n)}" data-to="bus">Put it on the bus</button>`;
+    }
+    return `<tr><td class="nmc">${name}</td><td class="stc"><span class="st ${r.st.code}">${SLABEL[r.st.code]}</span>${r.st.mine?'<div class="mine">your choice</div>':""}</td><td class="why">${esc(r.st.why)}</td><td class="act">${act}</td><td class="usedc"><div class="chips">${used}</div></td><td class="num">${r.it.sell?r.it.sell.toLocaleString():""}</td><td class="num">${r.it.tier}</td></tr>`; }).join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
+}
+$("q").oninput=renderItems;
+$("rows").addEventListener("click",e=>{ const s=e.target.closest(".swap"); if(s){ decide(s.dataset.item,s.dataset.to||null); return; } const b=e.target.closest("[data-mod]"); if(b) openMod(b.dataset.mod); });
+$("undoall").onclick=()=>{ choice={}; saveChoice(); redrawAll(); };
+$("choicelist").addEventListener("click",e=>{ const x=e.target.closest(".x"); if(x) decide(x.dataset.item,null); });
+
+// ---------- tabs ----------
+const TABS=["items","mods","rates"];
+function setTab(w){ for(const k of TABS){ $("tab-"+k).setAttribute("aria-selected",k===w); $("pane-"+k).hidden=k!==w; } }
+for(const k of TABS) $("tab-"+k).onclick=()=>setTab(k);
+
+// ---------- tab 2: build a module ----------
+let cur=null;
+const modNames=()=>Object.keys(I).filter(n=>I[n].kind==="made"&&!I[n].liq&&inTier(n)).sort((a,b)=>I[a].tier-I[b].tier||a.localeCompare(b));
+function renderList(){
+  const q=$("mq").value.trim().toLowerCase();
+  const names=modNames().filter(n=>!q||n.toLowerCase().includes(q));
+  $("modlist").innerHTML=names.map(n=>`<button data-r="${esc(n)}" aria-current="${n===cur}"><span>${esc(n)}${onBus(n)?' <i class="bustag">bus</i>':""}</span><small>T${I[n].tier}</small></button>`).join("")||`<div class="empty" style="padding:10px">Nothing matches.</div>`;
+  $("modsel").innerHTML=modNames().map(n=>`<option value="${esc(n)}"${n===cur?" selected":""}>${esc(n)} (T${I[n].tier})</option>`).join("");
+}
+$("mq").oninput=renderList;
+$("modlist").onclick=e=>{ const b=e.target.closest("button"); if(b) openMod(b.dataset.r); };
+$("modsel").onchange=e=>openMod(e.target.value);
+function startRate(root){ if(DEFAULT_RATE[root]) return DEFAULT_RATE[root]; const cs=cuts(root), block=C.cleanRate(root,cs), one=C.rate(R[root],root).per; const v=C.volume(C.solve(root,block,cs)).v; return v*C.HI<=cap()?block:one; }
+function openMod(root){ cur=root; $("rate").value=+startRate(root).toPrecision(5); setTab("mods"); renderList(); renderMod(); window.scrollTo&&window.scrollTo(0,0); }
+const rowKV=(k,v,sub)=>`<div class="row"><span>${k}${sub?` <small class="mut">${sub}</small>`:""}</span><span>${v}</span></div>`;
+function chain(root,cs){ const seen=new Set(), out=[];
+  const walk=(n,d)=>{ if(seen.has(n)) return; seen.add(n); if(n!==root) out.push({n,d}); if(n!==root&&cs.has(n)) return; const r=R[n]; if(!r||I[n].kind==="raw") return; for(const i in r.ins) walk(i,d+1); };
+  walk(root,0); return out; }
+function renderMod(){
+  if(!cur) return; const root=cur, rate=Math.max(0,+$("rate").value||0), cs=cuts(root), L=line();
+  const sol=C.solve(root,rate,cs), one=C.solve(root,1,cs);
+  // bus connections: each item coming off or going onto the bus needs a station, and a station carries CONN items a minute
+  const selfFuel=root==="Coke Powder", selfFert=root==="Advanced Fertilizer";
+  const CONN=120, connMax=num("connmax",8,1), fuel1=C.fuelPerMin(one,fe());
+  const perUnit={}; for(const k in one.busIn) if(one.busIn[k]>1e-12) perUnit[k]=one.busIn[k];
+  if(!selfFuel&&fuel1>1e-12) perUnit["Coke Powder"]=(perUnit["Coke Powder"]||0)+fuel1;
+  if(!selfFert&&one.fert>1e-12) perUnit["Advanced Fertilizer"]=(perUnit["Advanced Fertilizer"]||0)+one.fert;
+  const outUnit=Math.max(0,1-(selfFuel?fuel1:0)-(selfFert?one.fert:0));
+  const stations=f=>f>1e-9?Math.ceil(f/CONN-1e-9):0;
+  const connAt=r=>{ let c=stations(outUnit*r); for(const k in perUnit) c+=stations(perUnit[k]*r); return c; };
+  $("mname").textContent=root;
+  const it=I[root], st=status(root); const users=it.uses.filter(inTier);
+  const ends=[...users, it.relic?"research":"", it.sell?"the shop":""].filter(Boolean);
+  $("mmeta").innerHTML=`Tech tier ${it.tier}`+(it.sell?` · sells for ${it.sell.toLocaleString()}`:"")+(ends.length?` · goes to ${esc(listAnd(ends))}`:" · nothing at this tier uses it")+` · on the bus: <b class="${st.code==="no"?"":"cu"}">${SLABEL[st.code].toLowerCase()}</b>`;
+
+  // --- fit ---
+  const block=C.cleanRate(root,cs), step=C.rate(R[root],root).per, cp=cap();
+  const fillAt=r=>{ const v=C.volume(one,r).v; return [v*C.LO/cp*100,v*C.HI/cp*100]; };
+  const isClean=rate>0&&Math.abs(rate/block-Math.round(rate/block))<1e-6;
+  // sizes people would actually build. A size counts as tidy when every machine count is whole,
+  // or all whole except one machine that runs at exactly half (like 4.5 Athanors).
+  const evenness=r=>{ let half=0, odd=0; for(const m of one.list){ const n=m.count*r; if(m.machine==="Nursery"||n<=1+1e-9) continue; const d=Math.abs(n-Math.round(n)); if(d<0.02) continue; if(Math.abs(d-0.5)<0.02) half++; else odd++; } return {half,odd}; };
+  // every size on the grid of whole final machines and half clean blocks, each scored by how evenly its machines come out
+  const grid=new Set(); { const lim=6000; let over=0;
+    const stepA=step, stepB=block/2; let a=stepA, b=stepB, guard=0;
+    while(guard++<lim){ const r=Math.min(a,b); if(Math.abs(a-r)<1e-9) a+=stepA; if(Math.abs(b-r)<1e-9) b+=stepB; grid.add(+r.toFixed(6)); const lo=fillAt(r)[0]; if(lo>100||connAt(r)>connMax){ if(!over) over=r; if(r>=over*1.5) break; } } }
+  const cand=[...grid].sort((x,y)=>x-y).map(r=>{ const [lo,hi]=fillAt(r), ev=evenness(r); const conn=connAt(r), cOver=conn>connMax; return {r,lo,hi,conn,cOver,cls:cOver?"over":(hi<=100?"fit":(lo<=100?"tight":"over")),half:ev.half,odd:ev.odd}; });
+  const near=(x,m)=>Math.abs(x/m-Math.round(x/m))<1e-6&&x/m>0.5; const round=x=>near(x,5);
+  const pickMap=new Map(); const addRow=(c,label)=>{ if(c&&!pickMap.has(c.r)) pickMap.set(c.r,[c,label]); };
+  const BELTS=[[30,"Half a belt"],[60,"One full belt"],[90,"A belt and a half"],[120,"Two full belts"]];
+  for(const [v,label] of BELTS){ const c=cand.find(c=>Math.abs(c.r-v)<1e-6); if(c&&c.cls!=="over"&&!c.odd) addRow(c,label); }
+  const fitC=cand.filter(c=>c.cls==="fit"), tightC=cand.filter(c=>c.cls==="tight"), overC=cand.filter(c=>c.cls==="over");
+  // best = most machines coming out even (no uneven counts, then fewest halves), then a round output, then the bigger size
+  const best=(a,smallest)=>{ if(!a.length) return null; return a.slice().sort((x,y)=>(x.odd-y.odd)||(round(y.r)-round(x.r))||(x.half-y.half)||(smallest?x.r-y.r:y.r-x.r))[0]; };
+  { const b=best(fitC); addRow(b, b&&round(b.r)?"Biggest round size that fits":"Biggest that fits"); }
+  addRow(best(tightC), "Tight squeeze");
+  addRow(best(overC.filter(c=>c.r<=overC[0].r*1.3),true), "First size that won't fit");
+  const pick=[...pickMap.values()].sort((a,b)=>a[0].r-b[0].r);
+  const evTxt=c=>c.odd?plural(c.odd,"machine count")+" uneven":(c.half?"All whole, except "+(c.half===1?"one machine":c.half+" machines")+" at half":"All machine counts whole");
+  let rows=""; for(const [c,what] of pick){ const [cc,t]=c.cOver?["over","Too big"]:verdict(c.lo,c.hi);
+    rows+=`<tr class="${Math.abs(c.r-rate)<1e-6?"sel":""}"><td>${what}</td><td class="num">${fmt(c.r)}/min</td><td class="num">${Math.round(c.lo)}–${Math.round(c.hi)}%</td><td><span class="fitpill ${cc}">${t}</span>${c.cOver?` <small class="mut">needs ${c.conn} bus connections</small>`:""}</td><td class="num">${c.conn} of ${connMax}</td><td>${evTxt(c)}</td><td><button class="link" data-rate="${c.r}">Use this</button></td></tr>`; }
+  if(!fitC.length&&!tightC.length) rows=`<tr><td colspan="7" class="empty">Even the smallest size is too big for this tile.</td></tr>`+rows;
+  const evNow=evenness(rate);
+  let mC=0,mT=0,bC=0,bT=0;
+  for(let k=1;k<=800;k++){ const r=k*step, [lo,hi]=fillAt(r); if(connAt(r)>connMax) break; if(hi<=100) mC=r; if(lo<=100) mT=r; else break; }
+  for(let n=1;n<=60;n++){ const [lo,hi]=fillAt(n*block); if(connAt(n*block)>connMax) break; if(hi<=100) bC=n*block; if(lo<=100) bT=n*block; else break; }
+  const fin=one.list.find(m=>m.item===root)||one.list[0];
+  const [flo,fhi]=fillAt(rate); const connNow=connAt(rate), connBad=connNow>connMax; const [fc,ft]=connBad?["over","Too big"]:verdict(flo,fhi);
+  $("fit").innerHTML=`<div class="fitbox">
+    <div class="fithead"><span class="fitpill ${fc}">${ft}</span> <b>${fmt(rate)}/min takes about ${Math.round(flo)}–${Math.round(fhi)}% of a ${dimTxt()} tile${connBad?`, but needs ${connNow} bus connections and a tile only has ${connMax}`:` and ${connNow} of its ${connMax} bus connections`}.</b>${rate>0&&evNow.odd?` <span class="fitsub">At this size ${plural(evNow.odd,"machine count")} ${evNow.odd>1?"don't":"doesn't"} come out even, so those machines sit partly idle (see Busy).</span>`:(rate>0&&evNow.half?` <span class="fitsub">Every machine count is whole except ${evNow.half>1?evNow.half+" that run":"one that runs"} at half.</span>`:"")}</div>
+    <div class="maxline">
+      <div><span class="lab">Clean block</span> <b>${fmt(block)}/min</b> <span class="fitsub">the smallest size where every machine count comes out whole</span></div>
+      <div><span class="lab">Most that fits, clean blocks</span> ${bC?`<b>${fmt(bC)}/min</b> comfortably`:`<b>none</b> comfortably`}${bT>bC?` · <b>${fmt(bT)}/min</b> as a tight squeeze`:""}</div>
+      <div><span class="lab">Most that fits, any size</span> ${mC?`<b>${fmt(mC)}/min</b> comfortably`:`<b>none</b> comfortably`}${mT>mC?` · <b>${fmt(mT)}/min</b> as a tight squeeze`:""} <span class="fitsub">in steps of one ${esc(fin.machine)}, ${fmt(step)}/min each</span></div>
+    </div>
+    <div class="tablebox inner"><table class="fitt"><thead><tr><th>Sizes worth building in this tile</th><th class="num">Output</th><th class="num">Fill</th><th>Verdict</th><th class="num">Bus connections</th><th>Machine counts</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="fitsub">Fill is the machines' own size (plus a stone furnace under each group of heated machines) times 2.4–2.8 to allow for belts, lifts and stands. That spread was measured on your coke and fertilizer modules. Knowledge altars, splitters and chests aren't counted.</p></div>`;
+
+  // --- what comes in and out ---
+  const fuel=C.fuelPerMin(sol,fe());
+  let bus=""; const busItems=Object.entries(sol.busIn).filter(([,v])=>v>1e-9).sort((a,b)=>b[1]-a[1]);
+  for(const [k,v] of busItems) bus+=rowKV(esc(k),fmt(v)+"/min","ingredient");
+  if(fuel>1e-9&&!selfFuel) bus+=rowKV("Coke Powder",fmt(fuel)+"/min","fuel for the heated machines");
+  if(sol.fert>1e-9&&!selfFert) bus+=rowKV("Advanced Fertilizer",fmt(sol.fert)+"/min","for the nurseries");
+  const busTotal=busItems.reduce((a,[,v])=>a+v,0)+(selfFuel?0:fuel)+(selfFert?0:sol.fert);
+  $("busin").innerHTML=(bus||`<div class="empty">Nothing. This module runs on coins alone.</div>`)+(bus?`<div class="row tot"><span>Total off the bus</span><span>${fmt(busTotal)}/min</span></div>`:"");
+  let coins=""; for(const [k,v] of Object.entries(sol.coins).sort((a,b)=>b[1]*I[b[0]].buy-a[1]*I[a[0]].buy)) coins+=rowKV(esc(k),fmt(v)+"/min",fmt(v*I[k].buy)+" copper/min");
+  $("coins").innerHTML=(coins||`<div class="empty">No coins needed.</div>`)+(coins?`<div class="row tot"><span>Total coins</span><span>${fmt(sol.copper)} copper/min</span></div>`:"");
+  let outp=rowKV(esc(root)+" made",fmt(rate)+"/min");
+  if(selfFuel&&fuel>1e-9){ outp+=rowKV("Burned as its own fuel","−"+fmt(fuel)+"/min"); outp+=`<div class="row tot"><span>Leaves the module</span><span>${fmt(rate-fuel)}/min</span></div>`; }
+  else if(selfFert&&sol.fert>1e-9){ outp+=rowKV("Fed to its own nurseries","−"+fmt(sol.fert)+"/min"); outp+=`<div class="row tot"><span>Leaves the module</span><span>${fmt(rate-sol.fert)}/min</span></div>`; }
+  else outp+=`<div class="row tot"><span>Leaves the module</span><span>${fmt(rate)}/min</span></div>`;
+  for(const [k,v] of Object.entries(sol.spare)) outp+=rowKV("Spare "+esc(k),fmt(v)+"/min","byproduct");
+  $("outp").innerHTML=outp;
+  let cn=""; for(const k of Object.keys(perUnit).sort((a,b)=>perUnit[b]-perUnit[a])) cn+=rowKV(esc(k)+" in",stations(perUnit[k]*rate),fmt(perUnit[k]*rate)+"/min");
+  cn+=rowKV(esc(root)+" out",stations(outUnit*rate),fmt(outUnit*rate)+"/min");
+  cn+=`<div class="row tot"><span>Total</span><span class="${connBad?"bad":""}">${connNow} of ${connMax}</span></div>`;
+  $("conn").innerHTML=cn;
+
+  // --- ingredients ---
+  $("ingr").innerHTML=chain(root,cs).map(({n,d})=>{ const x=I[n]; if(!x) return ""; const fromBus=cs.has(n);
+    const amt=fromBus?(sol.busIn[n]||0):(x.kind==="raw"?(sol.coins[n]||0):(sol.flows[n]||0));
+    let src, act="", mark="";
+    if(x.liq) src=`<span class="src pipe">Piped here</span>`;
+    else if(x.kind==="raw") src=`<span class="src coin">Bought with coins</span>`;
+    else if(x.kind==="crop") src=`<span class="src here">Grown here</span>`;
+    else { const s=status(n);
+      if(fromBus){ src=`<span class="src bus">Off the bus</span>`; if(!C.UNIVERSAL.includes(n)) act=s.mine?`<button class="swap" data-item="${esc(n)}" data-to="">Undo my choice</button>`:`<button class="swap" data-item="${esc(n)}" data-to="off">Keep it off the bus</button>`; if(!s.mine&&L.forcedBy[n]&&L.forcedBy[n].includes(root)) mark=` <small class="mut">(won't fit otherwise)</small>`; }
+      else { src=`<span class="src here">Made here</span>`; act=s.mine?`<button class="swap" data-item="${esc(n)}" data-to="">Undo my choice</button>`:`<button class="swap" data-item="${esc(n)}" data-to="bus">Put it on the bus</button>`; if(s.code==="maybe") mark=` <small class="mut">(a maybe)</small>`; }
+      if(s.mine) mark=` <small class="mut">(your choice)</small>`; }
+    return `<tr><td style="padding-left:${10+Math.min(d-1,6)*14}px">${esc(n)}</td><td class="num">${fmt(amt)}/min</td><td>${src}${mark}</td><td>${act}</td></tr>`; }).join("")||`<tr><td colspan="4" class="empty">No ingredients.</td></tr>`;
+
+  // --- machines ---
+  $("mrows").innerHTML=sol.list.map(m=>{ const n=m.count, b=Math.ceil(n-1e-9), busy=b?n/b*100:0;
+    return `<tr><td>${esc(m.machine)}${m.heat?'<span class="heat">HEAT</span>':""}</td><td>${esc(m.out)}</td><td class="num">${fmt(m.each)}/min${m.capped?' <small class="mut">belt cap</small>':""}</td><td class="num">${fmt(n)}</td><td class="num">${b}</td><td class="num ${busy<99.5?"idle":""}">${b?Math.round(busy)+"%":"—"}</td></tr>`; }).join("");
+  const tot=sol.list.reduce((a,m)=>a+Math.ceil(m.count-1e-9),0); const vv=C.volume(sol);
+  $("mtot").textContent=plural(tot,"machine")+(vv.furn?" plus "+plural(vv.furn,"stone furnace")+" for heat":"");
+
+  // --- byproducts ---
+  const notes=[];
+  for(const m of sol.list){ for(const o of m.out.split(" + ").slice(1)){
+    if(sol.recycled[o]>1e-9){ const mk=sol.list.find(x=>x.item===o); notes.push(`<li><b>${esc(o)} comes back out of the ${esc(m.machine)}</b> (${fmt(sol.recycled[o])}/min is reused here). Merge it in with a <b>priority merger, recycled ${esc(o)} first</b>${mk?`, ahead of the ${esc(o)} from the ${esc(mk.machine)}`:""}. Otherwise fresh supply fills the line, the ${esc(m.machine)} can't get rid of its ${esc(o)}, and it stops.</li>`); }
+    if(sol.spare[o]>1e-9) notes.push(`<li><b>${fmt(sol.spare[o])}/min of spare ${esc(o)} comes out of the ${esc(m.machine)}.</b> It needs somewhere to go, like knowledge altars on the overflow side of a priority splitter, or the ${esc(m.machine)} backs up and stops.</li>`);
+  }}
+  $("notes").innerHTML=notes.length?`<div class="box"><h3>Byproducts: the only things that can stall this module</h3><ul class="notes">${notes.join("")}</ul><p class="fitsub">Everything else is safe to over-build. A machine with nowhere to send its output just waits.</p></div>`:"";
+}
+$("rate").oninput=renderMod;
+$("fit").addEventListener("click",e=>{ const x=e.target.closest("[data-rate]"); if(x){ $("rate").value=+(+x.dataset.rate).toPrecision(6); renderMod(); } });
+$("ingr").addEventListener("click",e=>{ const b=e.target.closest(".swap"); if(b) decide(b.dataset.item,b.dataset.to||null); });
+
+// ---------- tab 3: machine rates ----------
+function renderRates(){
+  const q=$("rq").value.trim().toLowerCase(); const seen=new Set(); const rows=[];
+  for(const n of Object.keys(I).sort((a,b)=>I[a].tier-I[b].tier||a.localeCompare(b))){ const r=R[n]; if(!r||I[n].kind==="raw"||seen.has(r.id)||!inTier(n)) continue; seen.add(r.id);
+    const main=Object.keys(r.outs)[0]; const x=C.rate(r,main); const crafts=x.per/r.outs[main];
+    const ins=Object.entries(r.ins).map(([k,v])=>fmt(v*crafts)+" "+k).join(" + ")||(I[n].kind==="crop"?fmt(crafts*r.nut/720)+" Advanced Fertilizer":"—");
+    const outs=Object.entries(r.outs).map(([k,v])=>fmt(v*crafts)+" "+k).join(" + ");
+    const txt=(main+" "+r.machine+" "+ins).toLowerCase(); if(q&&!txt.includes(q)) continue;
+    rows.push(`<tr><td class="name">${esc(main)}</td><td>${esc(r.machine)}</td><td>${esc(ins)}</td><td>${esc(outs)}</td><td class="num">${r.heat?fmt(r.heat):""}</td><td class="why">${x.capped?"Capped at one belt (60/min). The recipe alone would be faster.":""}</td><td class="num">${I[n].tier}</td></tr>`); }
+  $("rrows").innerHTML=rows.join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
+}
+$("rq").oninput=renderRates;
+
+// ---------- redraw ----------
+function redrawAll(){ saveSettings(); line(); if(cur&&!inTier(cur)) cur=modNames()[0]||null; { const ks=Object.keys(choice).filter(k=>I[k]); $("choices").hidden=!ks.length;
+    $("choicelist").innerHTML=ks.map(k=>`<span class="chip pick">${esc(k)}: ${choice[k]==="bus"?"on the bus":"kept off the bus"} <button class="x" data-item="${esc(k)}" aria-label="Undo ${esc(k)}">×</button></span>`).join(""); } renderItems(); renderList(); renderMod(); renderRates(); }
+for(const id of ["tier","fe","connmax"]) $(id).oninput=redrawAll;
+for(const d of ["mL","mW","mH"]){ const a=$(d), b=$(d+"2"); b.value=a.value; a.oninput=()=>{ b.value=a.value; redrawAll(); }; b.oninput=()=>{ a.value=b.value; redrawAll(); }; }
+$("tier").onchange=redrawAll;
+line();
+cur=I["Jupiter"]&&inTier("Jupiter")?"Jupiter":modNames()[0];
+$("rate").value=+startRate(cur).toPrecision(5);
+redrawAll();
+
+</script>
+</body>
+</html>
