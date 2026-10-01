@@ -167,16 +167,16 @@ tr.itemhead th{white-space:nowrap}
   <section class="rule" aria-label="Settings and the rule">
     <div class="controls">
       <b class="grp">Your upgrades</b>
-      <label class="inl" for="lvlbelt">Logistics (belt speed) level <input type="number" id="lvlbelt" min="0" step="1" value="0" style="width:60px"></label>
-      <label class="inl" for="lvlspeed">Factory Efficiency level <input type="number" id="lvlspeed" min="0" step="1" value="0" style="width:60px"></label>
-      <label class="inl" for="fe">Fuel Efficiency level <input type="number" id="fe" min="0" step="1" value="0" style="width:60px"></label>
+      <label class="inl" for="lvlbelt">Logistics (belt speed) level <input type="number" autocomplete="off" id="lvlbelt" min="0" step="1" value="0" style="width:60px"></label>
+      <label class="inl" for="lvlspeed">Factory Efficiency level <input type="number" autocomplete="off" id="lvlspeed" min="0" step="1" value="0" style="width:60px"></label>
+      <label class="inl" for="fe">Fuel Efficiency level <input type="number" autocomplete="off" id="fe" min="0" step="1" value="0" style="width:60px"></label>
       <small class="mut" id="upnote"></small>
     </div>
     <div class="controls">
       <b class="grp">Your base</b>
-      <label class="inl" for="tier">Show items up to tier <select id="tier"></select></label>
-      <span class="inl">Tile size <label for="mL" class="vh">Length</label><input type="number" id="mL" min="1" step="1" value="14" style="width:54px"> × <label for="mW" class="vh">Width</label><input type="number" id="mW" min="1" step="1" value="14" style="width:54px"> × <label for="mH" class="vh">Height</label><input type="number" id="mH" min="1" step="1" value="15" style="width:54px"> <small class="mut">L × W × H</small></span>
-      <label class="inl" for="connmax">Bus connections per tile <input type="number" id="connmax" min="1" step="1" value="8" style="width:56px"> <small class="mut" id="connnote"></small></label>
+      <label class="inl" for="tier">Show items up to tier <select id="tier" autocomplete="off"></select></label>
+      <span class="inl">Tile size <label for="mL" class="vh">Length</label><input type="number" autocomplete="off" id="mL" min="1" step="1" value="14" style="width:54px"> × <label for="mW" class="vh">Width</label><input type="number" autocomplete="off" id="mW" min="1" step="1" value="14" style="width:54px"> × <label for="mH" class="vh">Height</label><input type="number" autocomplete="off" id="mH" min="1" step="1" value="15" style="width:54px"> <small class="mut">L × W × H</small></span>
+      <label class="inl" for="connmax">Bus connections per tile <input type="number" autocomplete="off" id="connmax" min="1" step="1" value="8" style="width:56px"> <small class="mut" id="connnote"></small></label>
     </div>
     <div><b>How the bus line is drawn.</b> A module makes everything it needs inside its own tile, from coins, whenever that fits. Each item then lands in one of four places:</div>
     <ul class="legendlist">
@@ -238,8 +238,8 @@ tr.itemhead th{white-space:nowrap}
         <div class="dhead">
           <div><h2 id="mname"></h2><div class="mut" id="mmeta"></div></div>
           <div class="controls">
-            <label class="inl" for="rate">Output <input type="number" id="rate" min="0" step="any" style="width:96px"> /min</label>
-            <span class="inl">Tile size <label for="mL2" class="vh">Length</label><input type="number" id="mL2" min="1" step="1" style="width:54px" title="Length"> × <label for="mW2" class="vh">Width</label><input type="number" id="mW2" min="1" step="1" style="width:54px" title="Width"> × <label for="mH2" class="vh">Height</label><input type="number" id="mH2" min="1" step="1" style="width:54px" title="Height"> <small class="mut">L × W × H</small></span>
+            <label class="inl" for="rate">Output <input type="number" autocomplete="off" id="rate" min="0" step="any" style="width:96px"> /min</label>
+            <span class="inl">Tile size <label for="mL2" class="vh">Length</label><input type="number" autocomplete="off" id="mL2" min="1" step="1" style="width:54px" title="Length"> × <label for="mW2" class="vh">Width</label><input type="number" autocomplete="off" id="mW2" min="1" step="1" style="width:54px" title="Width"> × <label for="mH2" class="vh">Height</label><input type="number" autocomplete="off" id="mH2" min="1" step="1" style="width:54px" title="Height"> <small class="mut">L × W × H</small></span>
           </div>
         </div>
         <div id="fit"></div>
@@ -379,8 +379,12 @@ for(let t=1;t<=maxTier;t++){ const o=document.createElement("option"); o.value=t
 $("tier").value=maxTier;
 // your settings are remembered in this browser
 const SET_IDS=["tier","fe","mL","mW","mH","connmax","lvlbelt","lvlspeed"];
-try{ const sv=JSON.parse(localStorage.getItem("bsp_settings")||"{}")||{}; for(const id of SET_IDS){ const v=+sv[id]; if(sv[id]!=null&&sv[id]!==""&&isFinite(v)&&v>=0&&(id!=="tier"||(v>=1&&v<=maxTier))) $(id).value=sv[id]; } }catch(e){}
-const saveSettings=()=>{ try{ const o={}; for(const id of SET_IDS) o[id]=$(id).value; localStorage.setItem("bsp_settings",JSON.stringify(o)); }catch(e){} };
+// Set every setting explicitly: the saved value if there is one, otherwise the default.
+// (Browsers refill form fields by position after a reload, which put old values in the wrong boxes.)
+const SET_DEFAULT={tier:maxTier,fe:0,mL:14,mW:14,mH:15,connmax:8,lvlbelt:0,lvlspeed:0};
+{ let sv={}; try{ sv=JSON.parse(localStorage.getItem("bsp_settings_v2")||"{}")||{}; }catch(e){ sv={}; }
+  for(const id of SET_IDS){ const v=+sv[id]; const ok=sv[id]!=null&&sv[id]!==""&&isFinite(v)&&v>=0&&(id!=="tier"||(v>=1&&v<=maxTier)); $(id).value=ok?sv[id]:SET_DEFAULT[id]; } }
+const saveSettings=()=>{ try{ const o={}; for(const id of SET_IDS) o[id]=$(id).value; localStorage.setItem("bsp_settings_v2",JSON.stringify(o)); }catch(e){} };
 const num=(id,def,min)=>Math.max(min,+$(id).value||def);
 const cap=()=>num("mL",14,1)*num("mW",14,1)*num("mH",15,1);
 const dimTxt=()=>num("mL",14,1)+"×"+num("mW",14,1)+"×"+num("mH",15,1);

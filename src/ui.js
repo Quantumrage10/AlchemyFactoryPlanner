@@ -14,8 +14,12 @@ for(let t=1;t<=maxTier;t++){ const o=document.createElement("option"); o.value=t
 $("tier").value=maxTier;
 // your settings are remembered in this browser
 const SET_IDS=["tier","fe","mL","mW","mH","connmax","lvlbelt","lvlspeed"];
-try{ const sv=JSON.parse(localStorage.getItem("bsp_settings")||"{}")||{}; for(const id of SET_IDS){ const v=+sv[id]; if(sv[id]!=null&&sv[id]!==""&&isFinite(v)&&v>=0&&(id!=="tier"||(v>=1&&v<=maxTier))) $(id).value=sv[id]; } }catch(e){}
-const saveSettings=()=>{ try{ const o={}; for(const id of SET_IDS) o[id]=$(id).value; localStorage.setItem("bsp_settings",JSON.stringify(o)); }catch(e){} };
+// Set every setting explicitly: the saved value if there is one, otherwise the default.
+// (Browsers refill form fields by position after a reload, which put old values in the wrong boxes.)
+const SET_DEFAULT={tier:maxTier,fe:0,mL:14,mW:14,mH:15,connmax:8,lvlbelt:0,lvlspeed:0};
+{ let sv={}; try{ sv=JSON.parse(localStorage.getItem("bsp_settings_v2")||"{}")||{}; }catch(e){ sv={}; }
+  for(const id of SET_IDS){ const v=+sv[id]; const ok=sv[id]!=null&&sv[id]!==""&&isFinite(v)&&v>=0&&(id!=="tier"||(v>=1&&v<=maxTier)); $(id).value=ok?sv[id]:SET_DEFAULT[id]; } }
+const saveSettings=()=>{ try{ const o={}; for(const id of SET_IDS) o[id]=$(id).value; localStorage.setItem("bsp_settings_v2",JSON.stringify(o)); }catch(e){} };
 const num=(id,def,min)=>Math.max(min,+$(id).value||def);
 const cap=()=>num("mL",14,1)*num("mW",14,1)*num("mH",15,1);
 const dimTxt=()=>num("mL",14,1)+"×"+num("mW",14,1)+"×"+num("mH",15,1);
