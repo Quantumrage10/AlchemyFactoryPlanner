@@ -23,7 +23,7 @@ const mk = id => ({ id, value: '', innerHTML: '', textContent: '', hidden: false
   setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k]; },
   addEventListener() {}, appendChild(c) { this.children.push(c); }, closest() { return null; } });
 const doc = { getElementById: id => els[id] || (els[id] = mk(id)), createElement: () => mk('_'), querySelectorAll: () => [] };
-const init = { fe: '0', mL: '14', mW: '14', mH: '15', connmax: '8' };
+const init = { fe: '0', mL: '14', mW: '14', mH: '15', connmax: '8', lvlbelt: '0', lvlspeed: '0' };
 for (const k in init) doc.getElementById(k).value = init[k];
 const store = {};
 const ls = { getItem: k => store[k] || null, setItem: (k, v) => { store[k] = v; } };
@@ -42,6 +42,14 @@ api.decide('Linen Rope', 'bus');
 must(api.status('Linen Rope').code === 'ded', 'a bus choice did not apply');
 api.decide('Linen Rope', null);
 must(JSON.parse(store.bsp_settings).mH === '15', 'settings were not remembered');
+// upgrades: two levels of each should speed machines up and widen belts
+doc.getElementById('lvlbelt').value = '2'; doc.getElementById('lvlspeed').value = '2';
+doc.getElementById('lvlspeed').oninput();
+api.openMod('Glass');
+must(/Kiln\s+(HEAT\s+)?Glass\s+15\/min/.test(strip(els.mrows.innerHTML)), 'factory efficiency did not speed machines up: ' + strip(els.mrows.innerHTML).slice(0, 160));
+must(/90\/min/.test(els.upnote.textContent), 'belt upgrade did not change belt speed');
+doc.getElementById('lvlbelt').value = '0'; doc.getElementById('lvlspeed').value = '0';
+doc.getElementById('lvlspeed').oninput();
 
 if (process.argv.includes('--fragment')) {
   fs.mkdirSync(path.join(root, 'dist'), { recursive: true });

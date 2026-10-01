@@ -1,12 +1,18 @@
 // Pure calculation core. No DOM. Used by the page and by the node regression test.
 function makeCore(DATA){
   const I=DATA.items, R=DATA.recipes, M=DATA.machines;
-  const BELT=60, FUEL_HEAT=660, FERT_VALUE=720, LO=2.4, HI=2.8;
+  const FUEL_HEAT=660, FERT_VALUE=720, LO=2.4, HI=2.8;
+  // Upgrades. Belt speed and machine speed follow the same steps the game uses:
+  // belts +15/min per Logistics level up to 12, then +3; machines +25% per Factory Efficiency level up to 12, then +5%.
+  let BELT=60, SPEED=1;
+  function setUpgrades(beltLvl,speedLvl){ const b=Math.max(0,Math.floor(beltLvl||0)), f=Math.max(0,Math.floor(speedLvl||0));
+    BELT=60+Math.min(b,12)*15+Math.max(0,b-12)*3; SPEED=1+Math.min(f,12)*0.25+Math.max(0,f-12)*0.05; return {belt:BELT,speed:SPEED}; }
+  const belt=()=>BELT, speed=()=>SPEED;
   const isLiq=n=>!!(I[n]&&I[n].liq);
   const kind=n=>I[n]?I[n].kind:'none';
   // items per minute of `item` from ONE machine. Every machine is capped at one belt of output.
-  function rate(r,item){ let per=60/r.t*r.outs[item], capped=false;
-    if(!isLiq(item)){ let belt=BELT; if(r.shared) belt/=r.shared; if(per>belt+1e-9){ per=belt; capped=true; } }
+  function rate(r,item){ let per=60/r.t*r.outs[item]*SPEED, capped=false;
+    if(!isLiq(item)){ let cap=BELT; if(r.shared) cap/=r.shared; if(per>cap+1e-9){ per=cap; capped=true; } }
     return {per,capped}; }
   // cuts: Set of item names taken off the bus instead of made in this module
   function solve(root,outRate,cuts){
@@ -33,7 +39,7 @@ function makeCore(DATA){
       byp=nbyp; if(diff<1e-9) break;
     }
     let hps=0; const list=[];
-    for(const n in res.mach){ const r=R[n], c=res.mach[n]; hps+=c*(r.heat||0);
+    for(const n in res.mach){ const r=R[n], c=res.mach[n]; hps+=c*(r.heat||0)*SPEED;
       list.push({item:n, machine:r.machine, out:Object.keys(r.outs).join(' + '), each:rate(r,n).per, capped:rate(r,n).capped, count:c, heat:(r.heat||0)>0}); }
     list.sort((a,b)=>b.count-a.count);
     let copper=0; for(const n in res.coins) copper+=res.coins[n]*(I[n].buy||0);
@@ -73,6 +79,6 @@ function makeCore(DATA){
     for(const k in forcedBy) forcedBy[k]=[...new Set(forcedBy[k])];
     return {bus:B,forcedBy};
   }
-  return {I,R,M,BELT,LO,HI,UNIVERSAL,isLiq,kind,rate,solve,volume,fuelPerMin,cleanRate,busLine,simpleFrom};
+  return {I,R,M,LO,HI,UNIVERSAL,isLiq,kind,rate,solve,volume,fuelPerMin,cleanRate,busLine,simpleFrom,setUpgrades,belt,speed};
 }
 if(typeof module!=='undefined') module.exports={makeCore};

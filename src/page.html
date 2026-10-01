@@ -1,15 +1,22 @@
 <div class="wrap">
   <header>
     <h1>Bus Split Planner</h1>
-    <p class="sub">What goes on the bus, what each module needs, and whether it fits. Every number comes from the recipe data (<span id="ver"></span>) at base speeds, with every machine capped at one belt of output.</p>
+    <p class="sub">What goes on the bus, what each module needs, and whether it fits. Every number comes from the recipe data (<span id="ver"></span>) at your upgrade levels, with every machine capped at one belt of output.</p>
   </header>
 
   <section class="rule" aria-label="Settings and the rule">
     <div class="controls">
+      <b class="grp">Your upgrades</b>
+      <label class="inl" for="lvlbelt">Logistics (belt speed) level <input type="number" id="lvlbelt" min="0" step="1" value="0" style="width:60px"></label>
+      <label class="inl" for="lvlspeed">Factory Efficiency level <input type="number" id="lvlspeed" min="0" step="1" value="0" style="width:60px"></label>
+      <label class="inl" for="fe">Fuel Efficiency level <input type="number" id="fe" min="0" step="1" value="0" style="width:60px"></label>
+      <small class="mut" id="upnote"></small>
+    </div>
+    <div class="controls">
+      <b class="grp">Your base</b>
       <label class="inl" for="tier">Show items up to tier <select id="tier"></select></label>
       <span class="inl">Tile size <label for="mL" class="vh">Length</label><input type="number" id="mL" min="1" step="1" value="14" style="width:54px"> × <label for="mW" class="vh">Width</label><input type="number" id="mW" min="1" step="1" value="14" style="width:54px"> × <label for="mH" class="vh">Height</label><input type="number" id="mH" min="1" step="1" value="15" style="width:54px"> <small class="mut">L × W × H</small></span>
-      <label class="inl" for="fe">Fuel Efficiency level <input type="number" id="fe" min="0" step="1" value="0" style="width:60px"></label>
-      <label class="inl" for="connmax">Bus connections per tile <input type="number" id="connmax" min="1" step="1" value="8" style="width:56px"> <small class="mut">each carries 120/min (two belts)</small></label>
+      <label class="inl" for="connmax">Bus connections per tile <input type="number" id="connmax" min="1" step="1" value="8" style="width:56px"> <small class="mut" id="connnote"></small></label>
     </div>
     <div><b>How the bus line is drawn.</b> A module makes everything it needs inside its own tile, from coins, whenever that fits. Each item then lands in one of four places:</div>
     <ul class="legendlist">
@@ -96,7 +103,7 @@
         </table></div>
         <div class="mut" id="mtot"></div>
         <div id="notes"></div>
-        <p class="foot">Fuel is coke powder at 660 heat each, plus 10% per Fuel Efficiency level. Nurseries run on advanced fertilizer. A byproduct the module reuses (like the Athanor's charcoal) is taken off the machine counts first.</p>
+        <p class="foot">Fuel is coke powder at 660 heat each, plus 10% per Fuel Efficiency level. Faster machines burn fuel faster, so fuel per item stays the same. Nurseries run on advanced fertilizer. A byproduct the module reuses (like the Athanor's charcoal) is taken off the machine counts first.</p>
       </div>
     </div>
   </section>
@@ -107,6 +114,6 @@
       <thead><tr><th>Makes</th><th>Machine</th><th>One machine takes, per minute</th><th>One machine makes, per minute</th><th class="num">Heat /s</th><th>Note</th><th class="num">Tier</th></tr></thead>
       <tbody id="rrows"></tbody>
     </table></div>
-    <p class="foot">These are the numbers everything else on this page is built from. If one doesn't match what the machine shows in your game at base speed, that's the one that's wrong.</p>
+    <p class="foot">These are the numbers everything else on this page is built from. They follow the upgrade levels set at the top. If one doesn't match what the machine shows in your game, that's the one that's wrong.</p>
   </section>
 </div>

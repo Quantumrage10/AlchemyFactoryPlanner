@@ -13,7 +13,7 @@ const maxTier=Math.max(...Object.values(I).map(i=>i.tier));
 for(let t=1;t<=maxTier;t++){ const o=document.createElement("option"); o.value=t; o.textContent=t; $("tier").appendChild(o); }
 $("tier").value=maxTier;
 // your settings are remembered in this browser
-const SET_IDS=["tier","fe","mL","mW","mH","connmax"];
+const SET_IDS=["tier","fe","mL","mW","mH","connmax","lvlbelt","lvlspeed"];
 try{ const sv=JSON.parse(localStorage.getItem("bsp_settings")||"{}")||{}; for(const id of SET_IDS){ const v=+sv[id]; if(sv[id]!=null&&sv[id]!==""&&isFinite(v)&&v>=0&&(id!=="tier"||(v>=1&&v<=maxTier))) $(id).value=sv[id]; } }catch(e){}
 const saveSettings=()=>{ try{ const o={}; for(const id of SET_IDS) o[id]=$(id).value; localStorage.setItem("bsp_settings",JSON.stringify(o)); }catch(e){} };
 const num=(id,def,min)=>Math.max(min,+$(id).value||def);
@@ -31,7 +31,11 @@ function decide(item,to){ if(to===null) delete choice[item]; else choice[item]=t
 
 // ---------- the bus line for the current tier and tile size ----------
 let LINE=null, lineKey="";
-function line(){ const k=tierMax()+"|"+cap(); if(k!==lineKey){ LINE=C.busLine(tierMax(),cap()); lineKey=k; } return LINE; }
+// upgrades change belt speed and machine speed everywhere
+function applyUpgrades(){ const u=C.setUpgrades(+$("lvlbelt").value||0,+$("lvlspeed").value||0);
+  $("upnote").textContent="Belts carry "+fmt(u.belt)+"/min. Machines run at "+Math.round(u.speed*100)+"% speed."; $("connnote").textContent="each carries "+fmt(2*u.belt)+"/min (two belts)"; return u; }
+const baseUpgrades=()=>C.belt()===60&&C.speed()===1;
+function line(){ const k=tierMax()+"|"+cap()+"|"+C.belt()+"|"+C.speed(); if(k!==lineKey){ LINE=C.busLine(tierMax(),cap()); lineKey=k; } return LINE; }
 // Where an item stands. code: ded (own wagon type), mix (shared research wagon), maybe, no
 function status(n){
   const it=I[n], L=line(); const users=it.uses.filter(inTier); const made=it.kind==="made"&&!it.liq;
@@ -112,7 +116,7 @@ function renderList(){
 $("mq").oninput=renderList;
 $("modlist").onclick=e=>{ const b=e.target.closest("button"); if(b) openMod(b.dataset.r); };
 $("modsel").onchange=e=>openMod(e.target.value);
-function startRate(root){ if(DEFAULT_RATE[root]) return DEFAULT_RATE[root]; const cs=cuts(root), block=C.cleanRate(root,cs), one=C.rate(R[root],root).per; const v=C.volume(C.solve(root,block,cs)).v; return v*C.HI<=cap()?block:one; }
+function startRate(root){ if(DEFAULT_RATE[root]&&baseUpgrades()) return DEFAULT_RATE[root]; const cs=cuts(root), block=C.cleanRate(root,cs), one=C.rate(R[root],root).per; const v=C.volume(C.solve(root,block,cs)).v; return v*C.HI<=cap()?block:one; }
 function openMod(root){ cur=root; $("rate").value=+startRate(root).toPrecision(5); setTab("mods"); renderList(); renderMod(); window.scrollTo&&window.scrollTo(0,0); }
 const rowKV=(k,v,sub)=>`<div class="row"><span>${k}${sub?` <small class="mut">${sub}</small>`:""}</span><span>${v}</span></div>`;
 function chain(root,cs){ const seen=new Set(), out=[];
@@ -123,7 +127,7 @@ function renderMod(){
   const sol=C.solve(root,rate,cs), one=C.solve(root,1,cs);
   // bus connections: each item coming off or going onto the bus needs a station, and a station carries CONN items a minute
   const selfFuel=root==="Coke Powder", selfFert=root==="Advanced Fertilizer";
-  const CONN=120, connMax=num("connmax",8,1), fuel1=C.fuelPerMin(one,fe());
+  const CONN=2*C.belt(), connMax=num("connmax",8,1), fuel1=C.fuelPerMin(one,fe());
   const perUnit={}; for(const k in one.busIn) if(one.busIn[k]>1e-12) perUnit[k]=one.busIn[k];
   if(!selfFuel&&fuel1>1e-12) perUnit["Coke Powder"]=(perUnit["Coke Powder"]||0)+fuel1;
   if(!selfFert&&one.fert>1e-12) perUnit["Advanced Fertilizer"]=(perUnit["Advanced Fertilizer"]||0)+one.fert;
@@ -149,7 +153,7 @@ function renderMod(){
   const cand=[...grid].sort((x,y)=>x-y).map(r=>{ const [lo,hi]=fillAt(r), ev=evenness(r); const conn=connAt(r), cOver=conn>connMax; return {r,lo,hi,conn,cOver,cls:cOver?"over":(hi<=100?"fit":(lo<=100?"tight":"over")),half:ev.half,odd:ev.odd}; });
   const near=(x,m)=>Math.abs(x/m-Math.round(x/m))<1e-6&&x/m>0.5; const round=x=>near(x,5);
   const pickMap=new Map(); const addRow=(c,label)=>{ if(c&&!pickMap.has(c.r)) pickMap.set(c.r,[c,label]); };
-  const BELTS=[[30,"Half a belt"],[60,"One full belt"],[90,"A belt and a half"],[120,"Two full belts"]];
+  const BELTS=[[0.5,"Half a belt"],[1,"One full belt"],[1.5,"A belt and a half"],[2,"Two full belts"]].map(([m,l])=>[m*C.belt(),l]);
   for(const [v,label] of BELTS){ const c=cand.find(c=>Math.abs(c.r-v)<1e-6); if(c&&c.cls!=="over"&&!c.odd) addRow(c,label); }
   const fitC=cand.filter(c=>c.cls==="fit"), tightC=cand.filter(c=>c.cls==="tight"), overC=cand.filter(c=>c.cls==="over");
   // best = most machines coming out even (no uneven counts, then fewest halves), then a round output, then the bigger size
@@ -238,18 +242,18 @@ function renderRates(){
     const ins=Object.entries(r.ins).map(([k,v])=>fmt(v*crafts)+" "+k).join(" + ")||(I[n].kind==="crop"?fmt(crafts*r.nut/720)+" Advanced Fertilizer":"—");
     const outs=Object.entries(r.outs).map(([k,v])=>fmt(v*crafts)+" "+k).join(" + ");
     const txt=(main+" "+r.machine+" "+ins).toLowerCase(); if(q&&!txt.includes(q)) continue;
-    rows.push(`<tr><td class="name">${esc(main)}</td><td>${esc(r.machine)}</td><td>${esc(ins)}</td><td>${esc(outs)}</td><td class="num">${r.heat?fmt(r.heat):""}</td><td class="why">${x.capped?"Capped at one belt (60/min). The recipe alone would be faster.":""}</td><td class="num">${I[n].tier}</td></tr>`); }
+    rows.push(`<tr><td class="name">${esc(main)}</td><td>${esc(r.machine)}</td><td>${esc(ins)}</td><td>${esc(outs)}</td><td class="num">${r.heat?fmt(r.heat):""}</td><td class="why">${x.capped?"Capped at one belt ("+fmt(C.belt())+"/min). The recipe alone would be faster.":""}</td><td class="num">${I[n].tier}</td></tr>`); }
   $("rrows").innerHTML=rows.join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
 }
 $("rq").oninput=renderRates;
 
 // ---------- redraw ----------
-function redrawAll(){ saveSettings(); line(); if(cur&&!inTier(cur)) cur=modNames()[0]||null; { const ks=Object.keys(choice).filter(k=>I[k]); $("choices").hidden=!ks.length;
+function redrawAll(){ saveSettings(); applyUpgrades(); line(); if(cur&&!inTier(cur)) cur=modNames()[0]||null; { const ks=Object.keys(choice).filter(k=>I[k]); $("choices").hidden=!ks.length;
     $("choicelist").innerHTML=ks.map(k=>`<span class="chip pick">${esc(k)}: ${choice[k]==="bus"?"on the bus":"kept off the bus"} <button class="x" data-item="${esc(k)}" aria-label="Undo ${esc(k)}">×</button></span>`).join(""); } renderItems(); renderList(); renderMod(); renderRates(); }
-for(const id of ["tier","fe","connmax"]) $(id).oninput=redrawAll;
+for(const id of ["tier","fe","connmax","lvlbelt","lvlspeed"]) $(id).oninput=redrawAll;
 for(const d of ["mL","mW","mH"]){ const a=$(d), b=$(d+"2"); b.value=a.value; a.oninput=()=>{ b.value=a.value; redrawAll(); }; b.oninput=()=>{ a.value=b.value; redrawAll(); }; }
 $("tier").onchange=redrawAll;
-line();
+applyUpgrades(); line();
 cur=I["Jupiter"]&&inTier("Jupiter")?"Jupiter":modNames()[0];
 $("rate").value=+startRate(cur).toPrecision(5);
 redrawAll();

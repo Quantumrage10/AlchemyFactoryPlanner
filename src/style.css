@@ -143,3 +143,4 @@ table.items td.why{max-width:none;min-width:340px;width:55%}
 table.items td.usedc{min-width:120px;max-width:260px;width:20%}
 tr.itemhead th{white-space:nowrap}
 @media (max-width:760px){.side{display:none}.legendlist li{grid-template-columns:1fr}}
+.grp{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-width:110px}
