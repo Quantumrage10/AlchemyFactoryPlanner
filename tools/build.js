@@ -30,6 +30,8 @@ const ls = { getItem: k => store[k] || null, setItem: (k, v) => { store[k] = v; 
 const api = new Function('document', 'localStorage', 'window', script + '\n;return {openMod,decide,status};')(doc, ls, { scrollTo() {} });
 const strip = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const must = (cond, msg) => { if (!cond) { console.error('Smoke test failed: ' + msg); process.exit(1); } };
+// a stylesheet that closes its own <style> tag, or contains script, spills onto the page as text
+must(!/<\/style|<script|readFileSync|require\(/i.test(css), 'src/style.css contains something that is not CSS');
 must(els.rows.innerHTML.includes('Coke Powder'), 'bus table did not render');
 api.openMod('Jupiter');
 must(/Flax 360\/min/.test(strip(els.ingr.innerHTML)), 'Jupiter ingredients did not render');

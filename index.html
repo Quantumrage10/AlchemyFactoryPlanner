@@ -154,39 +154,6 @@ table.items td.why{max-width:none;min-width:340px;width:55%}
 table.items td.usedc{min-width:120px;max-width:260px;width:20%}
 tr.itemhead th{white-space:nowrap}
 @media (max-width:760px){.side{display:none}.legendlist li{grid-template-columns:1fr}}
-`;
-let head=fs.readFileSync('head.html','utf8');
-if(!head.includes('.bustag')) head=head.replace('</style>',EXTRA+'</style>');
-const core=fs.readFileSync('core.js','utf8').replace(/if\(typeof module!=='undefined'\)[^\n]*\n?/,'');
-const ui=fs.readFileSync('ui.js','utf8');
-const data=fs.readFileSync('data2.json','utf8');
-const script='const DATA='+data+';\n'+core+'\n'+ui;
-fs.writeFileSync('bus-split-planner.html', head+fs.readFileSync('body2.html','utf8')+'<script>\n'+script+'\n</script>\n');
-console.log('page bytes',fs.statSync('bus-split-planner.html').size);
-
-// ---- smoke test with a stub DOM ----
-const els={};
-const mk=id=>({id,value:'',innerHTML:'',textContent:'',hidden:false,dataset:{},children:[],attrs:{},
-  setAttribute(k,v){this.attrs[k]=String(v);},getAttribute(k){return this.attrs[k];},addEventListener(){},appendChild(c){this.children.push(c);},closest(){return null;}});
-const doc={getElementById:id=>els[id]||(els[id]=mk(id)),createElement:()=>mk('_'),querySelectorAll:()=>[]};
-const init={fe:'0',mL:'14',mW:'14',mH:'15',connmax:'8'}; for(const k in init) doc.getElementById(k).value=init[k];
-const store={}; const ls={getItem:k=>store[k]||null,setItem:(k,v)=>{store[k]=v;}};
-const fn=new Function('document','localStorage','window',script+'\n;return {openMod,renderMod,renderItems,decide,status,line,cutsFor,C};');
-const api=fn(doc,ls,{scrollTo(){}});
-const strip=h=>h.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
-console.log('\n[items tab]',els.count.textContent);
-console.log(strip(els.rows.innerHTML).slice(0,600));
-console.log('\n[Jupiter module] meta:',strip(els.mmeta.innerHTML));
-console.log('fit:',strip(els.fit.innerHTML).slice(0,420));
-console.log('bus in:',strip(els.busin.innerHTML));
-console.log('coins:',strip(els.coins.innerHTML));
-console.log('out:',strip(els.outp.innerHTML));
-console.log('ingredients:',strip(els.ingr.innerHTML));
-console.log('machines:',strip(els.mrows.innerHTML),'|',els.mtot.textContent);
-api.decide('Linen Rope','bus'); api.openMod('Jupiter'); console.log('[rope on bus -> Jupiter] bus in:',strip(els.busin.innerHTML),'| fit:',strip(els.fit.innerHTML).slice(0,90)); for(const m of ['Saturn','Mars','Glass','Steel Ingot']){ api.openMod(m); const f=strip(els.fit.innerHTML); console.log('['+m+' sizes]',f.slice(f.indexOf('Sizes worth'),f.indexOf('Fill is the')),'| conn:',strip(els.conn.innerHTML)); } for(const n of ['Steel Gear','Steel Ingot','Clay Powder','Brick']){const st=api.status(n);console.log('<'+n+'>',st.code,'-',st.why);} api.openMod('Wooden Pulley'); console.log('[rope on bus -> Pulley] bus in:',strip(els.busin.innerHTML)); api.decide('Linen Rope',null);
-for(const m of ['Saturn','Clay','Venus','Coke Powder']){ api.openMod(m); console.log('\n['+m+'] rate',els.rate.value,'| bus in:',strip(els.busin.innerHTML),'| coins:',strip(els.coins.innerHTML).slice(0,160),'| out:',strip(els.outp.innerHTML),'| fit:',strip(els.fit.innerHTML).slice(0,110)); }
-for(const n of ['Linen Rope','Linen Thread','Plank','Charcoal Powder','Jupiter','Glass','Wooden Pulley','Mortar','Healing Potion','Coke Powder','Brick']){const st=api.status(n);console.log('<'+n+'>',st.code,'-',st.why);}
-console.log('\n[rates tab]',strip(els.rrows.innerHTML).slice(0,400));
 </style>
 </head>
 <body>
