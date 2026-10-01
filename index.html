@@ -386,7 +386,6 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",
 function fmt(x){ if(!isFinite(x)) return "—"; if(Math.abs(x)<1e-9) return "0"; const a=Math.abs(x); if(a>=1000) return Math.round(x).toLocaleString(); if(a>=100) return x.toFixed(0); if(a>=10) return (+x.toFixed(1)).toString(); return (+x.toFixed(2)).toString(); }
 const plural=(n,w)=>n+" "+(n===1?w:(/y$/.test(w)?w.slice(0,-1)+"ies":(/s$/.test(w)?w:w+"s")));
 const listAnd=a=>a.length<=1?a.join(""):a.length===2?a.join(" and "):a.slice(0,-1).join(", ")+" and "+a[a.length-1];
-const DEFAULT_RATE={"Coke Powder":45,"Advanced Fertilizer":60,"Glass":60};
 $("ver").textContent="game "+DATA.version;
 
 // ---------- settings ----------
@@ -422,7 +421,6 @@ function applyUpgrades(){ const v=id=>+$(id).value||0; const u=C.setUpgrades(v("
   $("upnote").textContent="Belts carry "+fmt(u.belt)+"/min. Machines run at "+pct(u.speed)+" speed. Extractors and alembics yield "+pct(u.alch)+". Fertilizer feeds "+pct(u.fert)+" as much. Shop prices are "+pct(u.sell)+".";
   $("connnote").textContent="each carries "+fmt(2*u.belt)+"/min (two belts)"; return u; }
 const price=n=>Math.round((I[n].sell||0)*C.sellMult()*10)/10;
-const baseUpgrades=()=>C.belt()===60&&C.speed()===1;
 function line(){ const k=tierMax()+"|"+cap()+"|"+C.belt()+"|"+C.speed()+"|"+C.yieldOf({machine:"Extractor"})+"|"+C.fertValue(); if(k!==lineKey){ LINE=C.busLine(tierMax(),cap()); lineKey=k; } return LINE; }
 // Where an item stands. code: ded (own wagon type), mix (shared research wagon), maybe, no
 function status(n){
@@ -504,15 +502,9 @@ function renderList(){
 $("mq").oninput=renderList;
 $("modlist").onclick=e=>{ const b=e.target.closest("button"); if(b) openMod(b.dataset.r); };
 $("modsel").onchange=e=>openMod(e.target.value);
-function startRate(root){ if(DEFAULT_RATE[root]&&baseUpgrades()) return DEFAULT_RATE[root]; const cs=cuts(root), block=C.cleanRate(root,cs), one=C.rate(R[root],root).per; const v=C.volume(C.solve(root,block,cs)).v; return v*C.HI<=cap()?block:one; }
-function openMod(root){ cur=root; $("rate").value=+startRate(root).toPrecision(5); setTab("mods"); renderList(); renderMod(); window.scrollTo&&window.scrollTo(0,0); }
-const rowKV=(k,v,sub)=>`<div class="row"><span>${k}${sub?` <small class="mut">${sub}</small>`:""}</span><span>${v}</span></div>`;
-function chain(root,cs){ const seen=new Set(), out=[];
-  const walk=(n,d)=>{ if(seen.has(n)) return; seen.add(n); if(n!==root) out.push({n,d}); if(n!==root&&cs.has(n)) return; const r=R[n]; if(!r||I[n].kind==="raw") return; for(const i in r.ins) walk(i,d+1); };
-  walk(root,0); return out; }
-function renderMod(){
-  if(!cur) return; const root=cur, rate=Math.max(0,+$("rate").value||0), cs=cuts(root), L=line();
-  const sol=C.solve(root,rate,cs), one=C.solve(root,1,cs);
+// Everything about how big a module can be: bus connections, tile fill, and the sizes worth building.
+function sizing(root,cs){
+  const one=C.solve(root,1,cs);
   // bus connections: each item coming off or going onto the bus needs a station, and a station carries CONN items a minute
   const selfFuel=root==="Coke Powder", selfFert=root==="Advanced Fertilizer";
   const CONN=2*C.belt(), connMax=num("connmax",8,1), fuel1=C.fuelPerMin(one,fe());
@@ -522,15 +514,8 @@ function renderMod(){
   const outUnit=Math.max(0,1-(selfFuel?fuel1:0)-(selfFert?one.fert:0));
   const stations=f=>f>1e-9?Math.ceil(f/CONN-1e-9):0;
   const connAt=r=>{ let c=stations(outUnit*r); for(const k in perUnit) c+=stations(perUnit[k]*r); return c; };
-  $("mname").textContent=root;
-  const it=I[root], st=status(root); const users=it.uses.filter(inTier);
-  const ends=[...users, it.relic?"research":"", it.sell?"the shop":""].filter(Boolean);
-  $("mmeta").innerHTML=`Tech tier ${it.tier}`+(it.sell?` · sells for ${price(root).toLocaleString()}`:"")+(ends.length?` · goes to ${esc(listAnd(ends))}`:" · nothing at this tier uses it")+` · on the bus: <b class="${st.code==="no"?"":"cu"}">${SLABEL[st.code].toLowerCase()}</b>`;
-
-  // --- fit ---
   const block=C.cleanRate(root,cs), step=C.rate(R[root],root).per, cp=cap();
   const fillAt=r=>{ const v=C.volume(one,r).v; return [v*C.LO/cp*100,v*C.HI/cp*100]; };
-  const isClean=rate>0&&Math.abs(rate/block-Math.round(rate/block))<1e-6;
   // sizes people would actually build. A size counts as tidy when every machine count is whole,
   // or all whole except one machine that runs at exactly half (like 4.5 Athanors).
   const evenness=r=>{ let half=0, odd=0; for(const m of one.list){ const n=m.count*r; if(m.machine==="Nursery"||n<=1+1e-9) continue; const d=Math.abs(n-Math.round(n)); if(d<0.02) continue; if(Math.abs(d-0.5)<0.02) half++; else odd++; } return {half,odd}; };
@@ -550,6 +535,28 @@ function renderMod(){
   addRow(best(tightC), "Tight squeeze");
   addRow(best(overC.filter(c=>c.r<=overC[0].r*1.3),true), "First size that won't fit");
   const pick=[...pickMap.values()].sort((a,b)=>a[0].r-b[0].r);
+  return {one,selfFuel,selfFert,CONN,connMax,fuel1,perUnit,outUnit,stations,connAt,block,step,cp,fillAt,evenness,cand,pick,fitC,tightC,overC,round};
+}
+// Opens a module at the biggest size that fits its tile with every machine count whole;
+// failing that the biggest that fits at all, then the smallest tight squeeze, then one machine.
+function startRate(root){ const z=sizing(root,cuts(root)); const fit=z.pick.map(p=>p[0]).filter(c=>c.cls==="fit");
+  const whole=fit.filter(c=>!c.odd&&!c.half); const lastOf=a=>a.length?a[a.length-1]:null;
+  const c=lastOf(whole)||lastOf(fit)||z.tightC[0]; return c?c.r:z.step; }
+function openMod(root){ cur=root; $("rate").value=+startRate(root).toPrecision(5); setTab("mods"); renderList(); renderMod(); window.scrollTo&&window.scrollTo(0,0); }
+const rowKV=(k,v,sub)=>`<div class="row"><span>${k}${sub?` <small class="mut">${sub}</small>`:""}</span><span>${v}</span></div>`;
+function chain(root,cs){ const seen=new Set(), out=[];
+  const walk=(n,d)=>{ if(seen.has(n)) return; seen.add(n); if(n!==root) out.push({n,d}); if(n!==root&&cs.has(n)) return; const r=R[n]; if(!r||I[n].kind==="raw") return; for(const i in r.ins) walk(i,d+1); };
+  walk(root,0); return out; }
+function renderMod(){
+  if(!cur) return; const root=cur, rate=Math.max(0,+$("rate").value||0), cs=cuts(root), L=line();
+  const sol=C.solve(root,rate,cs);
+  const {one,selfFuel,selfFert,CONN,connMax,fuel1,perUnit,outUnit,stations,connAt,block,step,cp,fillAt,evenness,cand,pick,fitC,tightC,overC,round}=sizing(root,cs);
+  $("mname").textContent=root;
+  const it=I[root], st=status(root); const users=it.uses.filter(inTier);
+  const ends=[...users, it.relic?"research":"", it.sell?"the shop":""].filter(Boolean);
+  $("mmeta").innerHTML=`Tech tier ${it.tier}`+(it.sell?` · sells for ${price(root).toLocaleString()}`:"")+(ends.length?` · goes to ${esc(listAnd(ends))}`:" · nothing at this tier uses it")+` · on the bus: <b class="${st.code==="no"?"":"cu"}">${SLABEL[st.code].toLowerCase()}</b>`;
+
+  // --- fit ---
   const evTxt=c=>c.odd?plural(c.odd,"machine count")+" uneven":(c.half?"All whole, except "+(c.half===1?"one machine":c.half+" machines")+" at half":"All machine counts whole");
   let rows=""; for(const [c,what] of pick){ const [cc,t]=c.cOver?["over","Too big"]:verdict(c.lo,c.hi);
     rows+=`<tr class="${Math.abs(c.r-rate)<1e-6?"sel":""}"><td>${what}</td><td class="num">${fmt(c.r)}/min</td><td class="num">${Math.round(c.lo)}–${Math.round(c.hi)}%</td><td><span class="fitpill ${cc}">${t}</span>${c.cOver?` <small class="mut">needs ${c.conn} bus connections</small>`:""}</td><td class="num">${c.conn} of ${connMax}</td><td>${evTxt(c)}</td><td><button class="link" data-rate="${c.r}">Use this</button></td></tr>`; }

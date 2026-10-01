@@ -38,7 +38,9 @@ api.openMod('Jupiter');
 must(/Flax 360\/min/.test(strip(els.ingr.innerHTML)), 'Jupiter ingredients did not render');
 must(/Advanced Fertilizer.*12\/min/.test(strip(els.busin.innerHTML)), 'Jupiter bus inputs are wrong');
 api.openMod('Saturn');
-must(/Total 4 of 8/.test(strip(els.conn.innerHTML)), 'Saturn bus connections are wrong');
+// Saturn opens at the biggest size that fits, 0.4/min: two stations each for salt, brick and glass, plus one out
+must(els.rate.value == 0.4, 'Saturn did not open at its biggest fitting size: ' + els.rate.value);
+must(/Total 7 of 8/.test(strip(els.conn.innerHTML)), 'Saturn bus connections are wrong');
 api.decide('Linen Rope', 'bus');
 must(api.status('Linen Rope').code === 'ded', 'a bus choice did not apply');
 api.decide('Linen Rope', null);
