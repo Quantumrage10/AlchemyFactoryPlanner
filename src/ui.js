@@ -184,8 +184,10 @@ function renderBoard(){ const made=modNames(), st={}; for(const n of made) st[n]
     for(const el of document.querySelectorAll("#pane-items>.controls,#pane-rates>.controls,#pane-mods .detail>.tablebox")){ if(!el.offsetParent) continue;
       const d=el.getBoundingClientRect().top-8; if(Math.abs(d)<=160&&Math.abs(d)>1&&(best===null||Math.abs(d)<Math.abs(best))) best=d; }
     if(best!==null) window.scrollBy({top:best,behavior:"smooth"}); };
-  const onWheel=ev=>{ if(ev.ctrlKey) return; const now=Date.now(); clearTimeout(timer); timer=setTimeout(settle,170);
+  const onWheel=ev=>{ if(ev.ctrlKey) return; const now=Date.now(); clearTimeout(timer);
     const box=ev.target&&ev.target.closest?ev.target.closest(".tablebox"):null;
+    // with the mouse over a table the only catch is the one for scrolling inside it; the settle is for scrolling beside it
+    if(!box||box.classList.contains("inner")) timer=setTimeout(settle,170);
     if(!box||box.classList.contains("inner")||box.scrollHeight<=box.clientHeight+1){ lastPage=now; return; }
     const dy=ev.deltaMode===1?ev.deltaY*40:(ev.deltaMode===2?ev.deltaY*window.innerHeight:ev.deltaY);
     if(now-lastPage<350){ ev.preventDefault(); window.scrollBy(0,dy); lastPage=now; return; }
