@@ -173,31 +173,13 @@ function renderBoard(){ const made=modNames(), st={}; for(const n of made) st[n]
       +`<div class="addrow"><input type="search" class="addto" id="add-${id}" data-tag="${id}" autocomplete="off" placeholder="Add an item" aria-label="Add an item to this wagon"><nav class="modlist droplist" id="addlist-${id}" aria-label="Items to add" hidden></nav></div></div>`; }).join(""); }
 
 // ---------- tabs ----------
-// The catch. Three things, all driven by the mouse wheel only, so a click never moves the page:
-// 1. Stop scrolling close to a long table (or its search row) and the page settles with it at the top of the window.
-// 2. While you are scrolling the page, running the mouse over a table does not grab the wheel: the page keeps going.
-//    The table only takes the wheel once the mouse has rested on it for a moment.
-// 3. When you do start scrolling inside a table, the page moves to put that table (and its search row) at the top.
-{ let timer=null, lastPage=0, lastInner=0;
-  const anchorOf=box=>{ const p=box.previousElementSibling; return p&&p.classList.contains("controls")?p:box; };
-  const settle=()=>{ let best=null;
-    for(const el of document.querySelectorAll("#pane-items>.controls,#pane-rates>.controls,#pane-mods .detail>.tablebox")){ if(!el.offsetParent) continue;
-      const d=el.getBoundingClientRect().top-8; if(Math.abs(d)<=160&&Math.abs(d)>1&&(best===null||Math.abs(d)<Math.abs(best))) best=d; }
-    if(best!==null) window.scrollBy({top:best,behavior:"smooth"}); };
-  const onWheel=ev=>{ if(ev.ctrlKey) return; const now=Date.now(); clearTimeout(timer);
-    const box=ev.target&&ev.target.closest?ev.target.closest(".tablebox"):null;
-    // with the mouse over a table the only catch is the one for scrolling inside it; the settle is for scrolling beside it
-    if(!box||box.classList.contains("inner")) timer=setTimeout(settle,170);
-    if(!box||box.classList.contains("inner")||box.scrollHeight<=box.clientHeight+1){ lastPage=now; return; }
-    const dy=ev.deltaMode===1?ev.deltaY*40:(ev.deltaMode===2?ev.deltaY*window.innerHeight:ev.deltaY);
-    if(now-lastPage<350){ ev.preventDefault(); window.scrollBy(0,dy); lastPage=now; return; }
-    const atEnd=dy>0?box.scrollTop+box.clientHeight>=box.scrollHeight-1:box.scrollTop<=0;
-    if(atEnd){ lastPage=now; return; }
-    if(now-lastInner>400){ const d=anchorOf(box).getBoundingClientRect().top-8; if(Math.abs(d)>1) window.scrollBy({top:d,behavior:"smooth"}); }
-    lastInner=now; };
-  if(document.addEventListener) document.addEventListener("wheel",onWheel,{passive:false,capture:true}); }
+// Frozen headings, the standard way: the page is the only thing that scrolls, each table's heading row sticks to the
+// top of the window while its table is on screen, and a search row above a table sticks just above the heading.
+// The stylesheet does the sticking; all the script does is tell it how tall each search row is.
+function fitTables(){ for(const k of ["items","rates"]){ const pane=$("pane-"+k), c=pane.querySelector?pane.querySelector(":scope>.controls"):null; if(c&&c.offsetParent) pane.style.setProperty("--toolh",c.offsetHeight+"px"); } }
+if(window.addEventListener) window.addEventListener("resize",fitTables);
 const TABS=["setup","items","mods","rates"];
-function setTab(w){ for(const k of TABS){ $("tab-"+k).setAttribute("aria-selected",k===w); $("pane-"+k).hidden=k!==w; } $("ctx").hidden=w==="setup"; if(w==="mods") layoutTree(); }
+function setTab(w){ for(const k of TABS){ $("tab-"+k).setAttribute("aria-selected",k===w); $("pane-"+k).hidden=k!==w; } $("ctx").hidden=w==="setup"; if(w==="mods") layoutTree(); fitTables(); }
 $("ctxgo").onclick=()=>setTab("setup");
 for(const k of TABS) $("tab-"+k).onclick=()=>setTab(k);
 
@@ -458,7 +440,7 @@ $("rq").oninput=renderRates;
 
 // ---------- redraw ----------
 function redrawAll(){ saveSettings(); applyUpgrades(); line(); if(cur&&!inTier(cur)) cur=modNames()[0]||null; $("ctxtxt").textContent="Your setup: items up to tier "+tierMax()+" · "+dimTxt()+" tiles with "+num("connmax",8,1)+" bus connections · burning "+C.fuel()+" · feeding "+C.fert()+" · belts carry "+fmt(C.belt())+"/min.";
-  renderBoard(); renderItems(); renderList(); renderMod(); renderRates(); }
+  renderBoard(); renderItems(); renderList(); renderMod(); renderRates(); fitTables(); }
 for(const id of ["tier","fe","connmax","lvlbelt","lvlspeed","lvlalch","lvlfert","lvlsell"]) $(id).oninput=redrawAll;
 for(const id of SEL_IDS) $(id).onchange=redrawAll;
 for(const d of ["mL","mW","mH"]) $(d).oninput=redrawAll;

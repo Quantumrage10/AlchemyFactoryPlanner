@@ -335,3 +335,17 @@ html{scroll-snap-type:y proximity}
 #pane-rates>.tablebox{max-height:calc(min(100vh - 16px,var(--tableh,860px)) - 64px)}
 /* the catch is done by the script after a wheel scroll, not by the browser, so clicks never move the page */
 html{scroll-snap-type:none}
+/* the main tables get their height from the script (see fitTables) */
+#pane-items>.tablebox,#pane-rates>.tablebox,#pane-mods .detail>.tablebox{max-height:none}
+/* FROZEN HEADINGS. The page is the only scroller. Tables are never boxed to a height and never scroll on their own;
+   their heading row sticks to the top of the window, under the search row where there is one. This replaces every
+   earlier height, inner-scroll and snap rule above. On a narrow window tables scroll sideways instead and nothing sticks. */
+html{scroll-snap-type:none}
+.tablebox,#pane-items>.tablebox,#pane-rates>.tablebox,#pane-mods .detail>.tablebox{max-height:none;height:auto;overflow:auto;scroll-snap-align:none}
+#pane-items>.controls,#pane-rates>.controls{scroll-snap-align:none}
+@media (min-width:980px){
+  .tablebox,#pane-items>.tablebox,#pane-rates>.tablebox,#pane-mods .detail>.tablebox{overflow:clip}
+  th{position:sticky;top:0;z-index:5}
+  #pane-items>.controls,#pane-rates>.controls{position:sticky;top:0;z-index:6;background:var(--ground);padding:8px 0;margin:-8px 0}
+  #pane-items>.tablebox th,#pane-rates>.tablebox th{top:var(--toolh,0px)}
+}
