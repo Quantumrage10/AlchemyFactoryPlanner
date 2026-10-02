@@ -247,11 +247,15 @@ function chain(root,cs){ const depth={}, into={}, kids={};
 // Byproduct arrows, drawn once the boxes are in place: a dashed line from the box of the machine a byproduct comes
 // out of to the box that uses it. It leaves the top or bottom of one box and enters the top or bottom of the other,
 // running behind any box in between; when both are in the same row it loops underneath.
-let byArrows=[];
+let byArrows=[], treeZoom=1;
+// Ctrl + scroll wheel over the tree zooms the tree alone, keeping the spot under the mouse where it is; plain scrolling is untouched
+$("ingr").addEventListener("wheel",e=>{ if(!e.ctrlKey) return; e.preventDefault(); const flow=$("ingr"), zw=flow.firstElementChild; if(!zw) return;
+  const old=treeZoom, z=Math.min(2,Math.max(0.15,old*(e.deltaY<0?1.1:1/1.1))); if(z===old) return;
+  const x=e.clientX-flow.getBoundingClientRect().left; treeZoom=z; zw.style.zoom=z; flow.scrollLeft=(flow.scrollLeft+x)*z/old-x; },{passive:false});
 function drawBy(){ const flow=$("ingr"), svg=flow.querySelector("svg.bylines"), txt=flow.querySelector("svg.bytext"); if(!svg||!txt) return;
-  const fr=flow.getBoundingClientRect(), W=flow.scrollWidth, H=flow.scrollHeight;
+  const zw=flow.firstElementChild, Z=treeZoom, fr=zw.getBoundingClientRect(), tr=zw.firstElementChild.getBoundingClientRect(), W=Math.ceil(tr.width/Z)+8, H=Math.ceil(tr.height/Z)+40;
   for(const s of [svg,txt]){ s.setAttribute("width",W); s.setAttribute("height",H); s.setAttribute("viewBox","0 0 "+W+" "+H); }
-  const nodes=Array.from(flow.querySelectorAll(".node")); const box=e=>{ const r=e.getBoundingClientRect(); return {l:r.left-fr.left+flow.scrollLeft,t:r.top-fr.top+flow.scrollTop,w:r.width,h:r.height}; };
+  const nodes=Array.from(flow.querySelectorAll(".node")); const box=e=>{ const r=e.getBoundingClientRect(); return {l:(r.left-fr.left)/Z,t:(r.top-fr.top)/Z,w:r.width/Z,h:r.height/Z}; };
   let lines='<defs><marker id="byhead" markerWidth="10" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L10 6L0 12Z" fill="currentColor"/></marker></defs>', labels="";
   const used={};
   for(const a of byArrows){ const pe=nodes.find(e=>e.dataset.n===a.from), te=nodes.find(e=>e.dataset.id===String(a.to)); if(!pe||!te) continue; const p=box(pe), t=box(te);
@@ -274,20 +278,20 @@ function drawBy(){ const flow=$("ingr"), svg=flow.querySelector("svg.bylines"), 
     lines+='<path d="'+d+'" marker-end="url(#byhead)"/>';
     labels+='<text x="'+lx+'" y="'+ly+'" text-anchor="middle">'+esc(a.item)+' '+fmt(a.amt)+'/min</text>'; }
   svg.innerHTML=lines; txt.innerHTML=labels; }
-function layoutTree(){ const top=$("ingr").firstElementChild; if(!top||!top.getBoundingClientRect||$("pane-mods").hidden) return;
+function layoutTree(){ const zw=$("ingr").firstElementChild, top=zw&&zw.firstElementChild, Z=treeZoom; if(!top||!top.getBoundingClientRect||$("pane-mods").hidden) return;
   for(const e of $("ingr").querySelectorAll(".node,.stub,.tri,.kids")){ e.style.marginTop=""; e.style.marginLeft=""; }
   { const nodes=Array.from($("ingr").querySelectorAll(".node"));
     for(const a of byArrows){ const pe=nodes.find(e=>e.dataset.n===a.from), te=nodes.find(e=>e.dataset.id===String(a.to)); if(!pe||!te) continue;
       const br=te.parentElement; if(!br.classList.contains("tail")) continue;
-      const dx=pe.getBoundingClientRect().left-te.getBoundingClientRect().left, room=br.getBoundingClientRect().width-te.getBoundingClientRect().width-22;
+      const dx=(pe.getBoundingClientRect().left-te.getBoundingClientRect().left)/Z, room=(br.getBoundingClientRect().width-te.getBoundingClientRect().width)/Z-22;
       if(dx>0) te.style.marginLeft=Math.round(Math.min(dx,Math.max(0,room)))+"px"; } }
   const kid=(b,c)=>Array.from(b.children).filter(e=>e.classList.contains(c));
   const fix=b=>{ const node=kid(b,"node")[0], ks=kid(b,"kids")[0], bt=()=>b.getBoundingClientRect().top;
-    if(!ks){ const r=node.getBoundingClientRect(); return Math.round(r.top+r.height/2-bt()); }
-    const ys=Array.from(ks.children).map(c=>{ const a=fix(c); c.style.setProperty("--a",a+"px"); return c.getBoundingClientRect().top-bt()+a; });
+    if(!ks){ const r=node.getBoundingClientRect(); return Math.round((r.top+r.height/2-bt())/Z); }
+    const ys=Array.from(ks.children).map(c=>{ const a=fix(c); c.style.setProperty("--a",a+"px"); return (c.getBoundingClientRect().top-bt())/Z+a; });
     const k=ys.length; let mid=Math.round(k%2?ys[(k-1)/2]:(ys[k/2-1]+ys[k/2])/2); const pad=parseFloat(getComputedStyle(b).paddingTop)||0;
-    const need=node.getBoundingClientRect().height/2+pad-mid; if(need>0){ ks.style.marginTop=Math.ceil(need)+"px"; mid+=Math.ceil(need); }
-    for(const e of [node,...kid(b,"stub"),...kid(b,"tri")]) e.style.marginTop=Math.round(mid-pad-e.getBoundingClientRect().height/2)+"px";
+    const need=node.getBoundingClientRect().height/2/Z+pad-mid; if(need>0){ ks.style.marginTop=Math.ceil(need)+"px"; mid+=Math.ceil(need); }
+    for(const e of [node,...kid(b,"stub"),...kid(b,"tri")]) e.style.marginTop=Math.round(mid-pad-e.getBoundingClientRect().height/2/Z)+"px";
     return mid; };
   fix(top); drawBy(); }
 if(window.addEventListener) window.addEventListener("resize",layoutTree);
@@ -373,7 +377,7 @@ function renderMod(){
       tail=!inner&&ks.length>0;
       if(inner) kids='<div class="kids">'+inner+'</div><div class="stub" aria-hidden="true"></div><div class="tri" aria-hidden="true"></div>'; }
     return '<div class="branch'+(tail?' tail':'')+'">'+kids+nodeHtml(n,q,isRoot,id)+'</div>'; };
-  $("ingr").innerHTML=tree(root,rate,0,0)+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg>'; layoutTree();
+  $("ingr").innerHTML='<div class="zw" style="zoom:'+treeZoom+'">'+tree(root,rate,0,0)+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg></div>'; layoutTree();
 
   // --- machines ---
   $("mrows").innerHTML=sol.list.filter(m=>m.count>1e-9).sort((a,b)=>(G.pos[a.item]??999)-(G.pos[b.item]??999)).map(m=>{ const n=m.count, b=Math.ceil(n-1e-9), busy=b?n/b*100:0;
