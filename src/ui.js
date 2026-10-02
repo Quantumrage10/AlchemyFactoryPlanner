@@ -173,8 +173,12 @@ function renderBoard(){ const made=modNames(), st={}; for(const n of made) st[n]
       +`<div class="addrow"><input type="search" class="addto" id="add-${id}" data-tag="${id}" autocomplete="off" placeholder="Add an item" aria-label="Add an item to this wagon"><nav class="modlist droplist" id="addlist-${id}" aria-label="Items to add" hidden></nav></div></div>`; }).join(""); }
 
 // ---------- tabs ----------
+// The text under a long table counts against the table's height, so the table and the text below it fit on screen together.
+function fitTables(){ for(const box of document.querySelectorAll("#pane-items>.tablebox,#pane-rates>.tablebox")){ let below=0;
+    for(let e=box.nextElementSibling;e;e=e.nextElementSibling) below+=e.offsetHeight+14; box.style.setProperty("--below",(below?below+40:0)+"px"); } }
+if(window.addEventListener) window.addEventListener("resize",fitTables);
 const TABS=["setup","items","mods","rates"];
-function setTab(w){ for(const k of TABS){ $("tab-"+k).setAttribute("aria-selected",k===w); $("pane-"+k).hidden=k!==w; } $("ctx").hidden=w==="setup"; if(w==="mods") layoutTree(); }
+function setTab(w){ for(const k of TABS){ $("tab-"+k).setAttribute("aria-selected",k===w); $("pane-"+k).hidden=k!==w; } $("ctx").hidden=w==="setup"; if(w==="mods") layoutTree(); fitTables(); }
 $("ctxgo").onclick=()=>setTab("setup");
 for(const k of TABS) $("tab-"+k).onclick=()=>setTab(k);
 
@@ -435,7 +439,7 @@ $("rq").oninput=renderRates;
 
 // ---------- redraw ----------
 function redrawAll(){ saveSettings(); applyUpgrades(); line(); if(cur&&!inTier(cur)) cur=modNames()[0]||null; $("ctxtxt").textContent="Your setup: items up to tier "+tierMax()+" · "+dimTxt()+" tiles with "+num("connmax",8,1)+" bus connections · burning "+C.fuel()+" · feeding "+C.fert()+" · belts carry "+fmt(C.belt())+"/min.";
-  renderBoard(); renderItems(); renderList(); renderMod(); renderRates(); }
+  renderBoard(); renderItems(); fitTables(); renderList(); renderMod(); renderRates(); }
 for(const id of ["tier","fe","connmax","lvlbelt","lvlspeed","lvlalch","lvlfert","lvlsell"]) $(id).oninput=redrawAll;
 for(const id of SEL_IDS) $(id).onchange=redrawAll;
 for(const d of ["mL","mW","mH"]) $(d).oninput=redrawAll;

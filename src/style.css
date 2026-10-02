@@ -317,3 +317,5 @@ th{z-index:5;box-shadow:0 1px 0 var(--line)}
 .tablebox.inner{max-height:none}
 .tablebox{max-height:min(calc(100vh - 16px),var(--tableh,860px))}
 .tablebox.inner{max-height:none}
+.tablebox{max-height:calc(min(100vh - 16px,var(--tableh,860px)) - var(--below,0px))}
+.tablebox.inner{max-height:none}
