@@ -426,6 +426,7 @@ svg.bylines>circle.vis.hl{color:var(--copper)}
 .cicon.c-copper{--hi:#FFC49A;--coin:#EC7A2C;--lo:#A2420E;--rim:#6E2C08}
 .cicon.c-silver{--hi:#FFFFFF;--coin:#DCE4EE;--lo:#8D9AAC;--rim:#5E6978}
 .cicon.c-gold{--hi:#FFF2A8;--coin:#FFC61A;--lo:#D08A00;--rim:#8A5A00}
+.pushwarn{background:var(--copper-soft);border:1px solid var(--copper-line);border-radius:6px;padding:8px 12px;font-size:14px}
 </style>
 </head>
 <body>
@@ -494,7 +495,6 @@ svg.bylines>circle.vis.hl{color:var(--copper)}
       <li><span class="st maybe">Maybe</span> Fits inside the module that uses it, or can be bussed. Your call.</li>
       <li><span class="st no">No</span> Made where it's used, or next to the shop.</li>
     </ul>
-    <div class="mut"><b>Shared wagons push.</b> Too much of one item can fill the wagons before another gets picked up. If that happens, give the item its own wagons.</div>
   </details>
   <section class="board" aria-label="Your bus">
     <div class="boardhead">
@@ -503,6 +503,7 @@ svg.bylines>circle.vis.hl{color:var(--copper)}
       <div class="boardbtns"><button class="resetbtn" id="resetrec">Reset to recommended</button> <button class="resetbtn plain" id="clearall">Clear all</button></div>
     </div>
     <div class="mut"><b>Shared wagons.</b> Items in one box ride the same wagon type.</div>
+    <div class="pushwarn"><b>Shared wagons push.</b> Whatever is put on a shared wagon keeps going round until something takes it. Make too much of one item and it fills the wagons, and nothing else on that wagon gets picked up. If that happens, make less of it or give it its own wagons.</div>
     <div class="tags" id="tags"></div>
     <div class="addtagrow"><input type="text" id="newtag" autocomplete="off" placeholder="Name a new shared wagon…" aria-label="Name a new shared wagon"> <button class="resetbtn plain" id="addtag">Add shared wagon</button></div>
   </section>

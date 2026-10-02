@@ -415,3 +415,4 @@ svg.bylines>circle.vis.hl{color:var(--copper)}
 .cicon.c-copper{--hi:#FFC49A;--coin:#EC7A2C;--lo:#A2420E;--rim:#6E2C08}
 .cicon.c-silver{--hi:#FFFFFF;--coin:#DCE4EE;--lo:#8D9AAC;--rim:#5E6978}
 .cicon.c-gold{--hi:#FFF2A8;--coin:#FFC61A;--lo:#D08A00;--rim:#8A5A00}
+.pushwarn{background:var(--copper-soft);border:1px solid var(--copper-line);border-radius:6px;padding:8px 12px;font-size:14px}
