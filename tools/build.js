@@ -42,6 +42,9 @@ must(/Advanced Fertilizer.*12\/min/.test(strip(els.busin.innerHTML)), 'Jupiter b
 must(els.rate.step == 0.01, 'below one, the output should step by 0.01: ' + els.rate.step);
 els.rate.value = '1'; els.rate.oninput(); els.rate.value = '0'; els.rate.oninput({});
 must(els.rate.value == 0.99, 'stepping down from 1 should land on 0.99: ' + els.rate.value);
+{ const t = strip(els.mrows.innerHTML); must(t.indexOf('Nursery') < t.indexOf('Grinder') && t.indexOf('Grinder') < t.indexOf('Processor') && t.indexOf('Processor') < t.indexOf('Shaper'), 'machines should be listed in build order: ' + t.slice(0, 200)); }
+must(els.ingr.innerHTML.lastIndexOf('<b>') === els.ingr.innerHTML.indexOf('<b>Jupiter</b>'), 'the finished item should be the last box');
+{ const t = strip(els.ingr.innerHTML); must((t.match(/Logs /g) || []).length === 3, 'planks go into the pulley, the gears and Jupiter itself, so logs and planks should show three times: ' + t); }
 api.openMod('Saturn');
 // Saturn opens at the biggest size that fits, 0.4/min: two stations each for salt, brick and glass, plus one out
 must(els.rate.value == 0.4, 'Saturn did not open at its biggest fitting size: ' + els.rate.value);

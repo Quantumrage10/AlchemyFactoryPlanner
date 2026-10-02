@@ -128,14 +128,12 @@
         </div>
         <div class="box">
           <div class="dhead"><h3>Every ingredient, and where it comes from</h3></div>
-          <div class="tablebox inner"><table class="ingt">
-            <thead><tr><th>Ingredient</th><th class="num">Needed</th><th>Where it comes from</th><th></th></tr></thead>
-            <tbody id="ingr"></tbody>
-          </table></div>
+          <p class="fitsub">Read it left to right. Every item sits to the right of what goes into it, and the lines show what feeds what, ending at the finished item. Something used in several places shows up in each one, with the amount that place needs.</p>
+          <div class="flow" id="ingr"></div>
           <p class="fitsub">Put any ingredient on the bus, or keep it off, to see what it does to the size, the machines and what the bus has to carry. The choice applies to every module that uses that ingredient. Anything under an off-the-bus ingredient disappears from this module, because another module makes it.</p>
         </div>
         <div class="tablebox"><table>
-          <thead><tr><th>Machine</th><th>Makes</th><th class="num">One machine makes</th><th class="num">Exact</th><th class="num">Build</th><th class="num">Busy</th></tr></thead>
+          <thead><tr><th>Machine <small class="mut">in build order</small></th><th>Makes</th><th class="num">One machine makes</th><th class="num">Exact</th><th class="num">Build</th><th class="num">Busy</th></tr></thead>
           <tbody id="mrows"></tbody>
         </table></div>
         <div class="mut" id="mtot"></div>

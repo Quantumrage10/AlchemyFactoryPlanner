@@ -215,6 +215,59 @@ table.items td.act .swap{display:block;margin-top:4px}
 #pane-items table.items .chip{white-space:normal}
 #pane-items select.pick{width:100%;box-sizing:border-box}
 #pane-items tr.itemhead th{white-space:normal}
+.flow{display:flex;gap:10px;overflow-x:auto;align-items:flex-start;padding:2px 2px 10px}
+.flowcol{display:grid;gap:8px;flex:0 0 176px;align-content:start}
+.node{border:1px solid var(--line);border-left-width:3px;border-radius:6px;padding:7px 9px;background:var(--ground);font-size:13.5px;display:grid;gap:4px;justify-items:start}
+.node .amt{font-family:var(--mono);font-size:12.5px;color:var(--muted);white-space:nowrap}
+.node .into{color:var(--muted);font-size:12.5px}
+.node.root{border-color:var(--verd);background:var(--verd-soft)}
+.node.bus{border-left-color:var(--copper)}
+.node.coin{border-left-color:var(--gold)}
+.node.crop,.node.made{border-left-color:var(--verd)}
+.node.pipe{border-left-color:var(--pipe)}
+.node .swap{font-size:12.5px;padding:2px 7px;white-space:normal;text-align:left}
+.flow{display:block}
+.branch{display:flex;align-items:center;gap:6px}
+.kids{display:grid;gap:8px}
+.arrow{color:var(--muted);font-size:16px;flex:0 0 auto}
+.node{flex:0 0 150px;width:150px;box-sizing:border-box}
+.flow{display:flex;align-items:center;gap:8px}
+.lanes{display:grid;gap:10px}
+.lane{display:flex;align-items:center;gap:6px}
+.feeds{color:var(--muted);font-size:13px;white-space:nowrap}
+/* the ingredient tree and its connecting lines */
+.flow{display:block}
+.branch{display:flex;align-items:center;gap:0}
+.kids{display:block}
+.kids>.branch{position:relative;padding:5px 20px 5px 0}
+.kids>.branch::after{content:"";position:absolute;right:0;top:50%;width:20px;border-top:2px solid var(--verd)}
+.kids>.branch::before{content:"";position:absolute;right:0;top:0;bottom:0;border-right:2px solid var(--verd)}
+.kids>.branch:first-child::before{top:50%}
+.kids>.branch:last-child::before{bottom:calc(50% - 2px)}
+.arrow{flex:0 0 24px;width:24px;height:2px;background:var(--verd);position:relative;margin-right:8px}
+.arrow::after{content:"";position:absolute;right:-7px;top:-5px;border-left:9px solid var(--verd);border-top:6px solid transparent;border-bottom:6px solid transparent}
+/* arrow and lines share one centre line */
+.arrow{flex:0 0 30px;width:30px;height:12px;background:none;margin-right:6px;color:var(--verd);display:block}
+.arrow::after{content:none}
+.kids>.branch::after{top:calc(50% - 1px)}
+.kids>.branch:first-child::before{top:calc(50% - 1px)}
+.kids>.branch:last-child::before{bottom:calc(50% - 1px)}
+/* every box is joined to the bar by a line that runs the whole way, and arrowheads touch the box they point at */
+.kids>.branch{padding:5px 0}
+.kids>.branch::after{position:static;flex:1 1 22px;min-width:22px;width:auto;height:2px;border:0;background:var(--verd)}
+.arrow{margin-right:0}
+/* arrowheads are bare triangles: one line runs into each, never a line joined to another line */
+.tri{flex:0 0 auto;width:0;height:0;border-left:11px solid var(--verd);border-top:7px solid transparent;border-bottom:7px solid transparent}
+/* everything feeding one item gets the same height, so the item sits exactly midway between its feeding lines */
+.kids{display:grid;grid-auto-rows:1fr}
+/* tree rows keep their own height; the script sets --a, the height of each row's centre line */
+.branch{align-items:flex-start}
+.kids{display:block;gap:0}
+.kids>.branch::after{margin-top:calc(var(--a,30px) - 6px)}
+.kids>.branch::before{top:0;bottom:0}
+.kids>.branch:first-child::before{top:calc(var(--a,30px) - 1px)}
+.kids>.branch:last-child::before{bottom:calc(100% - var(--a,30px) - 1px)}
+.stub{flex:0 0 14px;width:14px;height:2px;background:var(--verd)}
 </style>
 </head>
 <body>
@@ -348,14 +401,12 @@ table.items td.act .swap{display:block;margin-top:4px}
         </div>
         <div class="box">
           <div class="dhead"><h3>Every ingredient, and where it comes from</h3></div>
-          <div class="tablebox inner"><table class="ingt">
-            <thead><tr><th>Ingredient</th><th class="num">Needed</th><th>Where it comes from</th><th></th></tr></thead>
-            <tbody id="ingr"></tbody>
-          </table></div>
+          <p class="fitsub">Read it left to right. Every item sits to the right of what goes into it, and the lines show what feeds what, ending at the finished item. Something used in several places shows up in each one, with the amount that place needs.</p>
+          <div class="flow" id="ingr"></div>
           <p class="fitsub">Put any ingredient on the bus, or keep it off, to see what it does to the size, the machines and what the bus has to carry. The choice applies to every module that uses that ingredient. Anything under an off-the-bus ingredient disappears from this module, because another module makes it.</p>
         </div>
         <div class="tablebox"><table>
-          <thead><tr><th>Machine</th><th>Makes</th><th class="num">One machine makes</th><th class="num">Exact</th><th class="num">Build</th><th class="num">Busy</th></tr></thead>
+          <thead><tr><th>Machine <small class="mut">in build order</small></th><th>Makes</th><th class="num">One machine makes</th><th class="num">Exact</th><th class="num">Build</th><th class="num">Busy</th></tr></thead>
           <tbody id="mrows"></tbody>
         </table></div>
         <div class="mut" id="mtot"></div>
@@ -657,7 +708,7 @@ function renderBoard(){ const made=modNames(), st={}; $("madelist").innerHTML=ma
 
 // ---------- tabs ----------
 const TABS=["setup","items","mods","rates"];
-function setTab(w){ for(const k of TABS){ $("tab-"+k).setAttribute("aria-selected",k===w); $("pane-"+k).hidden=k!==w; } $("ctx").hidden=w==="setup"; }
+function setTab(w){ for(const k of TABS){ $("tab-"+k).setAttribute("aria-selected",k===w); $("pane-"+k).hidden=k!==w; } $("ctx").hidden=w==="setup"; if(w==="mods") layoutTree(); }
 $("ctxgo").onclick=()=>setTab("setup");
 for(const k of TABS) $("tab-"+k).onclick=()=>setTab(k);
 
@@ -716,9 +767,32 @@ function startRate(root){ const z=sizing(root,cuts(root)); const fit=z.pick.map(
   const c=lastOf(whole)||lastOf(fit)||z.tightC[0]; return c?c.r:z.step; }
 function openMod(root){ cur=root; $("rate").value=+startRate(root).toPrecision(5); setTab("mods"); renderList(); renderMod(); window.scrollTo&&window.scrollTo(0,0); }
 const rowKV=(k,v,sub)=>`<div class="row"><span>${k}${sub?` <small class="mut">${sub}</small>`:""}</span><span>${v}</span></div>`;
-function chain(root,cs){ const seen=new Set(), out=[];
-  const walk=(n,d)=>{ if(seen.has(n)) return; seen.add(n); if(n!==root) out.push({n,d}); if(n!==root&&cs.has(n)) return; const r=R[n]; if(!r||I[n].kind==="raw") return; for(const i in r.ins) walk(i,d+1); };
-  walk(root,0); return out; }
+// Everything a module handles, as a graph. depth = steps from the finished item (the longest way round),
+// into = what each thing goes into here, order = build order: each line of ingredients from its start to the item it feeds.
+function chain(root,cs){ const depth={}, into={}, kids={};
+  const open=n=>n===root||!cs.has(n);
+  const visit=(n,d)=>{ if(d>40||(depth[n]!=null&&depth[n]>=d)) return; depth[n]=d; const r=R[n]; if(!open(n)||!r||I[n].kind==="raw"){ kids[n]=[]; return; }
+    kids[n]=Object.keys(r.ins).filter(i=>I[i]); for(const i of kids[n]){ (into[i]=into[i]||[]); if(!into[i].includes(n)) into[i].push(n); visit(i,d+1); } };
+  visit(root,0);
+  const height={}; const h=n=>height[n]!=null?height[n]:(height[n]=0, height[n]=1+Math.max(-1,...(kids[n]||[]).map(h)));
+  const order=[], seen=new Set(); const post=n=>{ if(seen.has(n)) return; seen.add(n); for(const k of (kids[n]||[]).slice().sort((a,b)=>h(b)-h(a))) post(k); order.push(n); };
+  post(root);
+  return {depth,into,order,pos:Object.fromEntries(order.map((n,i)=>[n,i]))}; }
+// Lines up the ingredient tree once the browser has sized the boxes. Each row keeps its own height; an item is then
+// lined up with the middle line feeding it (or midway between the middle two), so that line runs straight through.
+function layoutTree(){ const top=$("ingr").firstElementChild; if(!top||!top.getBoundingClientRect||$("pane-mods").hidden) return;
+  for(const e of $("ingr").querySelectorAll(".node,.stub,.tri,.kids")) e.style.marginTop="";
+  const kid=(b,c)=>Array.from(b.children).filter(e=>e.classList.contains(c));
+  const fix=b=>{ const node=kid(b,"node")[0], ks=kid(b,"kids")[0], bt=()=>b.getBoundingClientRect().top;
+    if(!ks){ const r=node.getBoundingClientRect(); return Math.round(r.top+r.height/2-bt()); }
+    const ys=Array.from(ks.children).map(c=>{ const a=fix(c); c.style.setProperty("--a",a+"px"); return c.getBoundingClientRect().top-bt()+a; });
+    const k=ys.length; let mid=Math.round(k%2?ys[(k-1)/2]:(ys[k/2-1]+ys[k/2])/2); const pad=parseFloat(getComputedStyle(b).paddingTop)||0;
+    const need=node.getBoundingClientRect().height/2+pad-mid; if(need>0){ ks.style.marginTop=Math.ceil(need)+"px"; mid+=Math.ceil(need); }
+    for(const e of [node,...kid(b,"stub"),...kid(b,"tri")]) e.style.marginTop=Math.round(mid-pad-e.getBoundingClientRect().height/2)+"px";
+    return mid; };
+  fix(top); }
+if(window.addEventListener) window.addEventListener("resize",layoutTree);
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(layoutTree);
 function renderMod(){
   if(!cur) return; const root=cur, rate=Math.max(0,+$("rate").value||0), cs=cuts(root), L=line();
   const sol=C.solve(root,rate,cs);
@@ -776,20 +850,28 @@ function renderMod(){
   $("conn").innerHTML=cn;
 
   // --- ingredients ---
-  $("ingr").innerHTML=chain(root,cs).map(({n,d})=>{ const x=I[n]; if(!x) return ""; const fromBus=cs.has(n);
-    const amt=fromBus?(sol.busIn[n]||0):(x.kind==="raw"?(sol.coins[n]||0):(sol.flows[n]||0));
-    let src, act="", mark="";
-    if(x.liq) src=`<span class="src pipe">Piped here</span>`;
-    else if(x.kind==="raw") src=`<span class="src coin">Bought with coins</span>`;
-    else if(x.kind==="crop") src=`<span class="src here">Grown here</span>`;
-    else { const s=status(n);
-      if(fromBus){ src=`<span class="src bus">Off the bus</span>`; if(!C.UNIVERSAL.includes(n)) act=s.mine?`<button class="swap" data-item="${esc(n)}" data-to="">Undo my choice</button>`:`<button class="swap" data-item="${esc(n)}" data-to="off">Keep it off the bus</button>`; if(!s.mine&&L.forcedBy[n]&&L.forcedBy[n].includes(root)) mark=` <small class="mut">(won't fit otherwise)</small>`; }
-      else { src=`<span class="src here">Made here</span>`; act=s.mine?`<button class="swap" data-item="${esc(n)}" data-to="">Undo my choice</button>`:`<button class="swap" data-item="${esc(n)}" data-to="bus">Put it on the bus</button>`; if(s.code==="maybe") mark=` <small class="mut">(a maybe)</small>`; }
-      if(s.mine) mark=` <small class="mut">(your choice)</small>`; }
-    return `<tr><td style="padding-left:${10+Math.min(d-1,6)*14}px">${esc(n)}</td><td class="num">${fmt(amt)}/min</td><td>${src}${mark}</td><td>${act}</td></tr>`; }).join("")||`<tr><td colspan="4" class="empty">No ingredients.</td></tr>`;
+  const G=chain(root,cs), maxD=Math.max(...G.order.map(n=>G.depth[n]));
+  const nodeHtml=(n,amt,isRoot)=>{ const x=I[n]; if(!x) return ""; const fromBus=!isRoot&&cs.has(n);
+    let src, act="", mark="", cls="made";
+    if(isRoot){ src='<span class="src here">Made here</span>'; mark=' <small class="mut">the finished item</small>'; cls="root"; }
+    else if(x.liq){ src='<span class="src pipe">Piped here</span>'; cls="pipe"; }
+    else if(x.kind==="raw"){ src='<span class="src coin">Bought with coins</span>'; cls="coin"; }
+    else if(x.kind==="crop"){ src='<span class="src here">Grown here</span>'; cls="crop"; }
+    else { const s=status(n); const btn=(to,txt)=>'<button class="swap" data-item="'+esc(n)+'" data-to="'+to+'">'+txt+'</button>';
+      if(fromBus){ src='<span class="src bus">Off the bus</span>'; cls="bus"; act=s.mine?btn("","Undo my choice"):btn("off","Keep it off the bus"); if(!s.mine&&L.forcedBy[n]&&L.forcedBy[n].includes(root)) mark=' <small class="mut">(won\'t fit otherwise)</small>'; }
+      else { src='<span class="src here">Made here</span>'; act=s.mine?btn("","Undo my choice"):btn("bus","Put it on the bus"); if(s.code==="maybe") mark=' <small class="mut">(a maybe)</small>'; }
+      if(s.mine) mark=' <small class="mut">(your choice)</small>'; }
+    return '<div class="node '+cls+'"><div><b>'+esc(n)+'</b> <span class="amt">'+fmt(amt)+'/min</span></div><div>'+src+mark+'</div>'+act+'</div>'; };
+  // a tree, read left to right: every item sits to the right of what goes into it, joined by lines, and the
+  // finished item is at the far right. Something used in several places shows up in each, with the amount that place needs.
+  const tree=(n,q,d)=>{ const isRoot=d===0, r=R[n], leaf=d>40||!r||I[n].kind==="raw"||(!isRoot&&cs.has(n));
+    let kids=""; if(!leaf){ const crafts=q/(r.outs[n]*C.yieldOf(r)); const ks=Object.keys(r.ins).filter(i=>I[i]).sort((x,y)=>(G.pos[x]??0)-(G.pos[y]??0));
+      if(ks.length) kids='<div class="kids">'+ks.map(i=>tree(i,crafts*r.ins[i],d+1)).join("")+'</div><div class="stub" aria-hidden="true"></div><div class="tri" aria-hidden="true"></div>'; }
+    return '<div class="branch">'+kids+nodeHtml(n,q,isRoot)+'</div>'; };
+  $("ingr").innerHTML=tree(root,rate,0); layoutTree();
 
   // --- machines ---
-  $("mrows").innerHTML=sol.list.map(m=>{ const n=m.count, b=Math.ceil(n-1e-9), busy=b?n/b*100:0;
+  $("mrows").innerHTML=sol.list.slice().sort((a,b)=>(G.pos[a.item]??999)-(G.pos[b.item]??999)).map(m=>{ const n=m.count, b=Math.ceil(n-1e-9), busy=b?n/b*100:0;
     return `<tr><td>${esc(m.machine)}${m.heat?'<span class="heat">HEAT</span>':""}</td><td>${esc(m.out)}</td><td class="num">${fmt(m.each)}/min${m.capped?' <small class="mut">belt cap</small>':""}</td><td class="num">${fmt(n)}</td><td class="num">${b}</td><td class="num ${busy<99.5?"idle":""}">${b?Math.round(busy)+"%":"—"}</td></tr>`; }).join("");
   const tot=sol.list.reduce((a,m)=>a+Math.ceil(m.count-1e-9),0); const vv=C.volume(sol);
   $("mtot").textContent=plural(tot,"machine")+(vv.furn?" plus "+plural(vv.furn,"stone furnace")+" for heat":"");

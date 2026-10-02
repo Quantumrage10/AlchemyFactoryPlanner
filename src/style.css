@@ -204,3 +204,56 @@ table.items td.act .swap{display:block;margin-top:4px}
 #pane-items table.items .chip{white-space:normal}
 #pane-items select.pick{width:100%;box-sizing:border-box}
 #pane-items tr.itemhead th{white-space:normal}
+.flow{display:flex;gap:10px;overflow-x:auto;align-items:flex-start;padding:2px 2px 10px}
+.flowcol{display:grid;gap:8px;flex:0 0 176px;align-content:start}
+.node{border:1px solid var(--line);border-left-width:3px;border-radius:6px;padding:7px 9px;background:var(--ground);font-size:13.5px;display:grid;gap:4px;justify-items:start}
+.node .amt{font-family:var(--mono);font-size:12.5px;color:var(--muted);white-space:nowrap}
+.node .into{color:var(--muted);font-size:12.5px}
+.node.root{border-color:var(--verd);background:var(--verd-soft)}
+.node.bus{border-left-color:var(--copper)}
+.node.coin{border-left-color:var(--gold)}
+.node.crop,.node.made{border-left-color:var(--verd)}
+.node.pipe{border-left-color:var(--pipe)}
+.node .swap{font-size:12.5px;padding:2px 7px;white-space:normal;text-align:left}
+.flow{display:block}
+.branch{display:flex;align-items:center;gap:6px}
+.kids{display:grid;gap:8px}
+.arrow{color:var(--muted);font-size:16px;flex:0 0 auto}
+.node{flex:0 0 150px;width:150px;box-sizing:border-box}
+.flow{display:flex;align-items:center;gap:8px}
+.lanes{display:grid;gap:10px}
+.lane{display:flex;align-items:center;gap:6px}
+.feeds{color:var(--muted);font-size:13px;white-space:nowrap}
+/* the ingredient tree and its connecting lines */
+.flow{display:block}
+.branch{display:flex;align-items:center;gap:0}
+.kids{display:block}
+.kids>.branch{position:relative;padding:5px 20px 5px 0}
+.kids>.branch::after{content:"";position:absolute;right:0;top:50%;width:20px;border-top:2px solid var(--verd)}
+.kids>.branch::before{content:"";position:absolute;right:0;top:0;bottom:0;border-right:2px solid var(--verd)}
+.kids>.branch:first-child::before{top:50%}
+.kids>.branch:last-child::before{bottom:calc(50% - 2px)}
+.arrow{flex:0 0 24px;width:24px;height:2px;background:var(--verd);position:relative;margin-right:8px}
+.arrow::after{content:"";position:absolute;right:-7px;top:-5px;border-left:9px solid var(--verd);border-top:6px solid transparent;border-bottom:6px solid transparent}
+/* arrow and lines share one centre line */
+.arrow{flex:0 0 30px;width:30px;height:12px;background:none;margin-right:6px;color:var(--verd);display:block}
+.arrow::after{content:none}
+.kids>.branch::after{top:calc(50% - 1px)}
+.kids>.branch:first-child::before{top:calc(50% - 1px)}
+.kids>.branch:last-child::before{bottom:calc(50% - 1px)}
+/* every box is joined to the bar by a line that runs the whole way, and arrowheads touch the box they point at */
+.kids>.branch{padding:5px 0}
+.kids>.branch::after{position:static;flex:1 1 22px;min-width:22px;width:auto;height:2px;border:0;background:var(--verd)}
+.arrow{margin-right:0}
+/* arrowheads are bare triangles: one line runs into each, never a line joined to another line */
+.tri{flex:0 0 auto;width:0;height:0;border-left:11px solid var(--verd);border-top:7px solid transparent;border-bottom:7px solid transparent}
+/* everything feeding one item gets the same height, so the item sits exactly midway between its feeding lines */
+.kids{display:grid;grid-auto-rows:1fr}
+/* tree rows keep their own height; the script sets --a, the height of each row's centre line */
+.branch{align-items:flex-start}
+.kids{display:block;gap:0}
+.kids>.branch::after{margin-top:calc(var(--a,30px) - 6px)}
+.kids>.branch::before{top:0;bottom:0}
+.kids>.branch:first-child::before{top:calc(var(--a,30px) - 1px)}
+.kids>.branch:last-child::before{bottom:calc(100% - var(--a,30px) - 1px)}
+.stub{flex:0 0 14px;width:14px;height:2px;background:var(--verd)}
