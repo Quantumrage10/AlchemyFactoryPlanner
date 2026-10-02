@@ -247,11 +247,23 @@ function chain(root,cs){ const depth={}, into={}, kids={};
 // Byproduct arrows, drawn once the boxes are in place: a dashed line from the box of the machine a byproduct comes
 // out of to the box that uses it. It leaves the top or bottom of one box and enters the top or bottom of the other,
 // running behind any box in between; when both are in the same row it loops underneath.
-let byArrows=[], treeZoom=1;
-// Ctrl + scroll wheel over the tree zooms the tree alone, keeping the spot under the mouse where it is; plain scrolling is untouched
-$("ingr").addEventListener("wheel",e=>{ if(!e.ctrlKey) return; e.preventDefault(); const flow=$("ingr"), zw=flow.firstElementChild; if(!zw) return;
-  const old=treeZoom, z=Math.min(2,Math.max(0.15,old*(e.deltaY<0?1.1:1/1.1))); if(z===old) return;
-  const x=e.clientX-flow.getBoundingClientRect().left; treeZoom=z; zw.style.zoom=z; flow.scrollLeft=(flow.scrollLeft+x)*z/old-x; },{passive:false});
+let byArrows=[], treeZoom=1, treeX=0, treeY=0, treeRoot=null, treeFresh=true;
+// The tree sits in a window you can move around in, like a map. Ctrl + scroll zooms in or out on the spot under the
+// mouse, dragging slides it, and plain scrolling still scrolls the page. Opening another module starts it at full size.
+const treeTf=()=>"translate("+treeX+"px,"+treeY+"px) scale("+treeZoom+")";
+function placeTree(reset){ const flow=$("ingr"), zw=flow.firstElementChild; if(!zw) return; const W0=zw.offsetWidth, H0=zw.offsetHeight;
+  if(reset){ treeZoom=1; flow.style.height=Math.min(H0,Math.round((window.innerHeight||800)*0.8))+"px"; treeX=Math.max(0,Math.round((flow.clientWidth-W0)/2)); treeY=0; }
+  const cw=flow.clientWidth, ch=flow.clientHeight, z=treeZoom;
+  treeX=Math.round(Math.min(cw-80,Math.max(80-W0*z,treeX))); treeY=Math.round(Math.min(ch-60,Math.max(60-H0*z,treeY)));
+  zw.style.transform=treeTf(); }
+$("ingr").addEventListener("wheel",e=>{ if(!e.ctrlKey) return; e.preventDefault(); const flow=$("ingr"); if(!flow.firstElementChild) return;
+  const old=treeZoom, z=Math.min(2.5,Math.max(0.1,old*(e.deltaY<0?1.12:1/1.12))); if(z===old) return;
+  const r=flow.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  treeX=mx-(mx-treeX)*z/old; treeY=my-(my-treeY)*z/old; treeZoom=z; placeTree(false); },{passive:false});
+{ let drag=null; const flow=$("ingr");
+  flow.addEventListener("pointerdown",e=>{ if(e.button!==0||e.target.closest("button")) return; drag={x:e.clientX,y:e.clientY,tx:treeX,ty:treeY}; flow.classList.add("drag"); flow.setPointerCapture&&flow.setPointerCapture(e.pointerId); });
+  flow.addEventListener("pointermove",e=>{ if(!drag) return; treeX=drag.tx+e.clientX-drag.x; treeY=drag.ty+e.clientY-drag.y; placeTree(false); });
+  const stop=()=>{ drag=null; flow.classList.remove("drag"); }; flow.addEventListener("pointerup",stop); flow.addEventListener("pointercancel",stop); }
 function drawBy(){ const flow=$("ingr"), svg=flow.querySelector("svg.bylines"), txt=flow.querySelector("svg.bytext"); if(!svg||!txt) return;
   const zw=flow.firstElementChild, Z=treeZoom, fr=zw.getBoundingClientRect(), tr=zw.firstElementChild.getBoundingClientRect(), W=Math.ceil(tr.width/Z)+8, H=Math.ceil(tr.height/Z)+40;
   for(const s of [svg,txt]){ s.setAttribute("width",W); s.setAttribute("height",H); s.setAttribute("viewBox","0 0 "+W+" "+H); }
@@ -278,7 +290,8 @@ function drawBy(){ const flow=$("ingr"), svg=flow.querySelector("svg.bylines"), 
     lines+='<path d="'+d+'" marker-end="url(#byhead)"/>';
     labels+='<text x="'+lx+'" y="'+ly+'" text-anchor="middle">'+esc(a.item)+' '+fmt(a.amt)+'/min</text>'; }
   svg.innerHTML=lines; txt.innerHTML=labels; }
-function layoutTree(){ const zw=$("ingr").firstElementChild, top=zw&&zw.firstElementChild, Z=treeZoom; if(!top||!top.getBoundingClientRect||$("pane-mods").hidden) return;
+function layoutTree(){ const zw=$("ingr").firstElementChild, top=zw&&zw.firstElementChild; if(!top||!top.getBoundingClientRect||$("pane-mods").hidden) return;
+  if(treeFresh){ treeZoom=1; treeX=0; treeY=0; zw.style.transform="none"; } const Z=treeZoom;
   for(const e of $("ingr").querySelectorAll(".node,.stub,.tri,.kids")){ e.style.marginTop=""; e.style.marginLeft=""; }
   { const nodes=Array.from($("ingr").querySelectorAll(".node"));
     for(const a of byArrows){ const pe=nodes.find(e=>e.dataset.n===a.from), te=nodes.find(e=>e.dataset.id===String(a.to)); if(!pe||!te) continue;
@@ -293,7 +306,7 @@ function layoutTree(){ const zw=$("ingr").firstElementChild, top=zw&&zw.firstEle
     const need=node.getBoundingClientRect().height/2/Z+pad-mid; if(need>0){ ks.style.marginTop=Math.ceil(need)+"px"; mid+=Math.ceil(need); }
     for(const e of [node,...kid(b,"stub"),...kid(b,"tri")]) e.style.marginTop=Math.round(mid-pad-e.getBoundingClientRect().height/2/Z)+"px";
     return mid; };
-  fix(top); drawBy(); }
+  fix(top); drawBy(); placeTree(treeFresh); treeFresh=false; }
 if(window.addEventListener) window.addEventListener("resize",layoutTree);
 if(document.fonts&&document.fonts.ready) document.fonts.ready.then(layoutTree);
 function renderMod(){
@@ -377,7 +390,8 @@ function renderMod(){
       tail=!inner&&ks.length>0;
       if(inner) kids='<div class="kids">'+inner+'</div><div class="stub" aria-hidden="true"></div><div class="tri" aria-hidden="true"></div>'; }
     return '<div class="branch'+(tail?' tail':'')+'">'+kids+nodeHtml(n,q,isRoot,id)+'</div>'; };
-  $("ingr").innerHTML='<div class="zw" style="zoom:'+treeZoom+'">'+tree(root,rate,0,0)+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg></div>'; layoutTree();
+  if(root!==treeRoot){ treeRoot=root; treeFresh=true; }
+  $("ingr").innerHTML='<div class="zw" style="transform:'+treeTf()+'">'+tree(root,rate,0,0)+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg></div>'; layoutTree();
 
   // --- machines ---
   $("mrows").innerHTML=sol.list.filter(m=>m.count>1e-9).sort((a,b)=>(G.pos[a.item]??999)-(G.pos[b.item]??999)).map(m=>{ const n=m.count, b=Math.ceil(n-1e-9), busy=b?n/b*100:0;

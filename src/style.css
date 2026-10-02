@@ -301,3 +301,10 @@ svg.bylines marker path{fill:currentColor;stroke:none;stroke-dasharray:none}
 /* the tree sits in a wrapper that Ctrl + scroll zooms */
 .flow{padding-top:0;padding-bottom:0}
 .zw{position:relative;padding:14px 4px 24px;width:max-content;min-width:100%;box-sizing:border-box}
+/* the page uses the whole width of the window; the ingredient tree sits centred in its box when it is narrower than the box */
+.wrap{max-width:none}
+.zw{min-width:0;margin:0 auto}
+/* the tree window: content is moved and scaled inside it */
+.flow{overflow:hidden;position:relative;cursor:grab;min-height:60px}
+.flow.drag{cursor:grabbing;user-select:none}
+.zw{position:absolute;left:0;top:0;transform-origin:0 0;margin:0;min-width:0;width:max-content}
