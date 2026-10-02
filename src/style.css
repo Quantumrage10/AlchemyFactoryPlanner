@@ -308,3 +308,12 @@ svg.bylines marker path{fill:currentColor;stroke:none;stroke-dasharray:none}
 .flow{overflow:hidden;position:relative;cursor:grab;min-height:60px}
 .flow.drag{cursor:grabbing;user-select:none}
 .zw{position:absolute;left:0;top:0;transform-origin:0 0;margin:0;min-width:0;width:max-content}
+/* table headings stay at the top of the window while their table is scrolling past, like frozen rows in a spreadsheet */
+@media (min-width:980px){.tablebox{overflow:clip}}
+th{z-index:5;box-shadow:0 1px 0 var(--line)}
+/* a long table scrolls inside its own box, under a heading row that never moves */
+.tablebox{overflow:auto;max-height:min(calc(100vh - 16px),860px)}
+@media (min-width:980px){.tablebox{overflow:auto}}
+.tablebox.inner{max-height:none}
+.tablebox{max-height:min(calc(100vh - 16px),var(--tableh,860px))}
+.tablebox.inner{max-height:none}

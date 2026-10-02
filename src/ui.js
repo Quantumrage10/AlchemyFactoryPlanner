@@ -8,6 +8,8 @@ const listAnd=a=>a.length<=1?a.join(""):a.length===2?a.join(" and "):a.slice(0,-
 $("ver").textContent="game "+DATA.version;
 
 // ---------- settings ----------
+// a long table is never taller than the screen it is on, so its heading and its rows always fit on screen together
+if(document.documentElement&&window.screen&&screen.availHeight) document.documentElement.style.setProperty("--tableh",Math.max(320,screen.availHeight-190)+"px");
 const maxTier=Math.max(...Object.values(I).map(i=>i.tier));
 for(let t=1;t<=maxTier;t++){ const o=document.createElement("option"); o.value=t; o.textContent=t; $("tier").appendChild(o); }
 $("tier").value=maxTier;
