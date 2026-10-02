@@ -502,7 +502,7 @@ svg.bylines>circle.vis.hl{color:var(--copper)}
       <span class="mut" id="planstate"></span>
       <div class="boardbtns"><button class="resetbtn" id="resetrec">Reset to recommended</button> <button class="resetbtn plain" id="clearall">Clear all</button></div>
     </div>
-    <div class="mut"><b>Shared wagons.</b> Items in one box ride the same wagon type.</div>
+    <div class="mut"><b>Shared wagons.</b> Items in one box ride the same wagon type. An item can be in more than one box: add it to each wagon you want it on.</div>
     <div class="pushwarn"><b>Shared wagons push.</b> Whatever is put on a shared wagon keeps going round until something takes it. Make too much of one item and it fills the wagons, and nothing else on that wagon gets picked up. If that happens, make less of it or give it its own wagons.</div>
     <div class="tags" id="tags"></div>
     <div class="addtagrow"><input type="text" id="newtag" autocomplete="off" placeholder="Name a new shared wagon…" aria-label="Name a new shared wagon"> <button class="resetbtn plain" id="addtag">Add shared wagon</button></div>
@@ -760,7 +760,11 @@ try{ const sv=JSON.parse(localStorage.getItem("bsp_plan_v1")||"null");
   else { const old=JSON.parse(localStorage.getItem("bsp_choice")||"{}")||{}; for(const k in old) plan.place[k]=old[k]==="bus"?"own":"off"; } }catch(e){}
 const savePlan=()=>{ try{ localStorage.setItem("bsp_plan_v1",JSON.stringify(plan)); }catch(e){} };
 const tagById=id=>plan.tags.find(t=>t.id===id);
-const valueOf=s=>s.code==="no"?"off":s.code==="maybe"?"maybe":s.code==="ded"?"own":"tag:"+s.wagon;
+// An item rides one shared wagon or several: a module can have a launch station for each. wagonsOf() lists them, in the
+// order the wagons are shown; wagon (singular) is the first, kept for sorting and for the recommended layout.
+const wagonsOf=s=>s.code!=="mix"?[]:(s.wagons&&s.wagons.length?s.wagons:[s.wagon]);
+const tagValue=ids=>"tag:"+plan.tags.map(t=>t.id).filter(id=>ids.includes(id)).join(",");
+const valueOf=s=>s.code==="no"?"off":s.code==="maybe"?"maybe":s.code==="ded"?"own":tagValue(wagonsOf(s));
 const recValue=n=>plan.cleared?"off":valueOf(rec(n));
 // put an item somewhere; putting it back where it would be anyway just forgets the change
 function setPlace(item,v){ if(v==null||v===recValue(item)) delete plan.place[item]; else plan.place[item]=v; savePlan(); redrawAll(); }
@@ -793,7 +797,7 @@ function status(n){ const p=plan.place[n], L=line(), it=I[n];
   if(p==="off") return {code:"no",mine:true,why:"Your choice. Modules that need it make their own."+(L.bus.has(n)&&L.forcedBy[n]?" Check those modules still fit: the "+listAnd(L.forcedBy[n].slice(0,3))+" module didn't have room for it.":"")};
   if(p==="maybe") return {code:"maybe",mine:true,why:"Your choice. Modules make their own until you decide."};
   if(p==="own") return {code:"ded",mine:true,why:"Your choice. Own tagged wagons."};
-  if(p&&p.slice(0,4)==="tag:"&&tagById(p.slice(4))){ const t=tagById(p.slice(4)); return {code:"mix",wagon:t.id,mine:true,why:"Your choice. Rides the "+t.name+" wagon."}; }
+  if(p&&p.slice(0,4)==="tag:"){ const ts=plan.tags.filter(t=>p.slice(4).split(",").includes(t.id)); if(ts.length) return {code:"mix",wagon:ts[0].id,wagons:ts.map(t=>t.id),mine:true,why:"Your choice. Rides the "+listAnd(ts.map(t=>t.name))+" wagon"+(ts.length>1?"s":"")+"."}; }
   if(plan.cleared) return {code:"no",why:(it.kind==="made"&&!it.liq)?"Off the bus until you place it.":"Made or bought where it's used."};
   return rec(n); }
 function statusBase(n){
@@ -822,7 +826,7 @@ let cutCache={}, cutKey="";
 function cuts(root){ const k=lineKey+"|"+JSON.stringify(plan); if(k!==cutKey){ cutCache={}; cutKey=k; } return cutCache[root]||(cutCache[root]=cutsFor(root)); }
 const verdict=(lo,hi)=>hi<=100?["ok","Fits"]:(lo<=100?["edge","Tight squeeze"]:["over","Too big"]);
 const SLABEL={ded:"Yes · own wagons",mix:"Yes · shared wagon",maybe:"Maybe",no:"No"};
-const label=st=>st.code==="mix"?"Yes · "+((tagById(st.wagon)||{}).name||"shared")+" wagon":SLABEL[st.code];
+const label=st=>st.code==="mix"?"Yes · "+(wagonsOf(st).map(id=>(tagById(id)||{}).name).filter(Boolean).join(" + ")||"shared")+" wagon"+(wagonsOf(st).length>1?"s":""):SLABEL[st.code];
 const SORD={ded:0,mix:1,maybe:2,no:3};
 
 // ---------- tab 1: what goes on the bus ----------
@@ -833,6 +837,7 @@ let sortK="bus", sortDir=1;
 // the picker: where this item goes. Every made item can be off the bus, a maybe, on its own wagons, or on any shared wagon.
 function picker(n,st){ const cur=valueOf(st);
   const opts=[["off","Off the bus"],["maybe","Maybe"],["own","Own wagons"]].concat(plan.tags.map(t=>["tag:"+t.id,t.name+" wagon"]));
+  if(!opts.some(o=>o[0]===cur)) opts.push([cur,wagonsOf(st).map(id=>(tagById(id)||{}).name).join(" + ")+" wagons"]);
   return `<select class="pick" data-item="${esc(n)}" aria-label="Where ${esc(n)} goes">`+opts.map(([v,l])=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(l)}</option>`).join("")+"</select>"+(st.mine?`<button class="swap" data-item="${esc(n)}" data-to="">Undo my choice</button>`:""); }
 function itemRow(n){
   const it=I[n]; const made=it.kind==="made"&&!it.liq; const st=status(n); const users=it.uses.filter(inTier);
@@ -862,28 +867,28 @@ function resetPlan(){ plan={place:{},tags:DEFAULT_TAGS(),cleared:false}; savePla
 function clearPlan(){ plan.place={}; plan.tags=[]; plan.cleared=true; savePlan(); redrawAll(); }
 function addTag(name){ name=String(name||"").trim(); if(!name) return null; const id="u"+Date.now().toString(36)+plan.tags.length; plan.tags.push({id,name}); savePlan(); redrawAll(); return id; }
 function renameTag(id,name){ const t=tagById(id); name=String(name||"").trim(); if(t&&name){ t.name=name; savePlan(); } redrawAll(); }
-function deleteTag(id){ plan.tags=plan.tags.filter(t=>t.id!==id); for(const k in plan.place) if(plan.place[k]==="tag:"+id) delete plan.place[k]; savePlan(); redrawAll(); }
+function deleteTag(id){ plan.tags=plan.tags.filter(t=>t.id!==id); for(const k in plan.place){ const p=plan.place[k]; if(typeof p==="string"&&p.slice(0,4)==="tag:"){ const ids=p.slice(4).split(",").filter(x=>x!==id); if(ids.length) plan.place[k]="tag:"+ids.join(","); else delete plan.place[k]; } } savePlan(); redrawAll(); }
 $("resetrec").onclick=resetPlan; $("clearall").onclick=clearPlan;
 $("addtag").onclick=()=>{ if(addTag($("newtag").value)) $("newtag").value=""; };
 // adding to a shared wagon works like the module search: click the box and the list drops down, type to narrow it, click a name to add it
 function fillAddList(inp){ const id=inp.dataset.tag, q=inp.value.trim().toLowerCase(), box=$("addlist-"+id); if(!box) return;
-  const names=modNames().filter(n=>valueOf(status(n))!=="tag:"+id&&(!q||n.toLowerCase().includes(q)));
+  const names=modNames().filter(n=>!wagonsOf(status(n)).includes(id)&&(!q||n.toLowerCase().includes(q)));
   box.innerHTML=names.map(n=>'<button data-item="'+esc(n)+'" data-tag="'+esc(id)+'"><span>'+esc(n)+'</span><small>T'+I[n].tier+'</small></button>').join("")||'<div class="empty" style="padding:10px">Nothing matches.</div>'; box.hidden=false; }
 $("tags").addEventListener("focusin",e=>{ const i=e.target.closest("input.addto"); if(i) fillAddList(i); });
 $("tags").addEventListener("input",e=>{ const i=e.target.closest("input.addto"); if(i) fillAddList(i); });
 $("tags").addEventListener("focusout",e=>{ const i=e.target.closest("input.addto"); if(i) setTimeout(()=>{ const box=$("addlist-"+i.dataset.tag); if(box) box.hidden=true; },150); });
-$("tags").addEventListener("mousedown",e=>{ const b=e.target.closest(".droplist button"); if(!b) return; e.preventDefault(); setPlace(b.dataset.item,"tag:"+b.dataset.tag); });
-$("tags").addEventListener("click",e=>{ const d=e.target.closest(".deltag"); if(d){ deleteTag(d.dataset.tag); return; } const x=e.target.closest(".rm"); if(x) setPlace(x.dataset.item,"own"); });
+$("tags").addEventListener("mousedown",e=>{ const b=e.target.closest(".droplist button"); if(!b) return; e.preventDefault(); setPlace(b.dataset.item,tagValue(wagonsOf(status(b.dataset.item)).concat([b.dataset.tag]))); });
+$("tags").addEventListener("click",e=>{ const d=e.target.closest(".deltag"); if(d){ deleteTag(d.dataset.tag); return; } const x=e.target.closest(".rm"); if(x){ const left=wagonsOf(status(x.dataset.item)).filter(id=>id!==x.dataset.tag); setPlace(x.dataset.item,left.length?tagValue(left):"own"); } });
 $("tags").addEventListener("change",e=>{ const r=e.target.closest("input.tagname"); if(r) renameTag(r.dataset.tag,r.value); });
 function renderBoard(){ const made=modNames(), st={}; for(const n of made) st[n]=status(n);
-  const own=made.filter(n=>st[n].code==="ded").length, mem=t=>made.filter(n=>st[n].code==="mix"&&st[n].wagon===t.id);
+  const own=made.filter(n=>st[n].code==="ded").length, mem=t=>made.filter(n=>wagonsOf(st[n]).includes(t.id));
   const shared=plan.tags.filter(t=>mem(t).length).length, changed=Object.keys(plan.place).filter(k=>I[k]).length;
   $("wcount").textContent="Wagon types on your bus: "+(own+shared)+" ("+own+" with their own wagons, "+shared+" shared)";
   $("planstate").textContent=(plan.cleared?"Recommendations are cleared. ":"")+(changed?plural(changed,"item")+" set by you.":(plan.cleared?"Nothing is on the bus yet.":"This is the recommended layout."));
   $("tags").innerHTML=plan.tags.map(t=>{ const m=mem(t), id=esc(t.id);
     return `<div class="tagbox"><div class="taghead"><input class="tagname" data-tag="${id}" value="${esc(t.name)}" aria-label="Name of this shared wagon" autocomplete="off"><span class="mut">wagon · ${plural(m.length,"item")}</span><button class="deltag" data-tag="${id}">Delete</button></div>`
       +(TAGNOTE[t.id]?`<div class="fitsub">${esc(TAGNOTE[t.id])}</div>`:"")
-      +`<div class="chips">${m.map(n=>`<span class="chip pick">${esc(n)} <button class="x rm" data-item="${esc(n)}" aria-label="Take ${esc(n)} off this wagon">×</button></span>`).join("")}</div>`
+      +`<div class="chips">${m.map(n=>`<span class="chip pick">${esc(n)} <button class="x rm" data-tag="${id}" data-item="${esc(n)}" aria-label="Take ${esc(n)} off this wagon">×</button></span>`).join("")}</div>`
       +`<div class="addrow"><input type="search" class="addto" id="add-${id}" data-tag="${id}" autocomplete="off" placeholder="Add an item" aria-label="Add an item to this wagon"><nav class="modlist droplist" id="addlist-${id}" aria-label="Items to add" hidden></nav></div></div>`; }).join(""); }
 
 // ---------- tabs ----------

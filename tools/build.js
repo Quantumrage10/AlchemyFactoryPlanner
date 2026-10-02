@@ -139,6 +139,11 @@ api.setPlace('Glass', 'tag:' + tid);
 must(api.status('Glass').code === 'mix' && /Yes · saturn parts wagon/.test(strip(els.rows.innerHTML)), 'an item should be addable to a shared wagon you made');
 api.openMod('Saturn');
 must(/Glass/.test(strip(els.busin.innerHTML)) && !/Brick/.test(strip(els.busin.innerHTML)), 'modules should follow the plan: ' + strip(els.busin.innerHTML));
+// one item on several shared wagons at once
+api.setPlace('Panacea Potion', 'tag:fuel,fert,research');
+must(where('Panacea Potion') === 'tag:research,fuel,fert' && /Yes · sell \/ research \+ fuel \+ fertilizer wagons/.test(strip(els.rows.innerHTML)), 'an item should be able to ride several shared wagons: ' + where('Panacea Potion'));
+must(['research', 'fuel', 'fert'].every(id => new RegExp('data-tag="' + id + '" data-item="Panacea Potion"').test(els.tags.innerHTML)), 'an item on several wagons should show in each wagon box');
+api.setPlace('Panacea Potion', null);
 api.deleteTag(tid);
 must(where('Glass') === 'own', 'deleting a shared wagon should put its items back');
 // clearing takes everything off the bus; resetting brings the recommended layout back
