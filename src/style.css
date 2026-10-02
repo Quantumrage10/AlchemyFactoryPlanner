@@ -321,3 +321,10 @@ th{z-index:5;box-shadow:0 1px 0 var(--line)}
 .tablebox.inner{max-height:none}
 /* a steady margin down both sides of the page, a little wider on wide screens */
 body{padding-inline:clamp(16px,4vw,72px)}
+/* scrolling the page catches gently on the top of each long table, then carries on if you keep going */
+html{scroll-snap-type:y proximity}
+.tablebox{scroll-snap-align:start;scroll-margin-top:8px}
+.tablebox.inner{scroll-snap-align:none}
+/* a long table is simply as tall as the window */
+.tablebox{max-height:min(calc(100vh - 16px),var(--tableh,860px))}
+.tablebox.inner{max-height:none}
