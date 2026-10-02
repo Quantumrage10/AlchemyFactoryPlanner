@@ -22,10 +22,10 @@ h1{font-size:30px;font-weight:700;letter-spacing:-.01em;margin:0;text-wrap:balan
 .rule b{font-weight:600}
 .legend{display:flex;flex-wrap:wrap;gap:8px}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
-.pill.bus{background:var(--copper-soft);color:var(--copper);border-color:color-mix(in srgb,var(--copper) 35%,transparent)}
-.pill.inside{background:var(--verd-soft);color:var(--verd);border-color:color-mix(in srgb,var(--verd) 35%,transparent)}
+.pill.bus{background:var(--copper-soft);color:var(--copper);border-color:var(--copper-line)}
+.pill.inside{background:var(--verd-soft);color:var(--verd);border-color:var(--verd-line)}
 .pill.site{background:var(--slate-soft);color:var(--slate)}
-.pill.end{background:var(--gold-soft);color:var(--gold);border-color:color-mix(in srgb,var(--gold) 35%,transparent)}
+.pill.end{background:var(--gold-soft);color:var(--gold);border-color:var(--gold-line)}
 .pill.pipe{background:var(--pipe-soft);color:var(--pipe)}
 button.pill{cursor:pointer;font-family:inherit}
 button.pill[aria-pressed="false"]{opacity:.45}
@@ -76,8 +76,8 @@ td.num,th.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-ali
 .pill.sold{background:var(--gold-soft);color:var(--gold)}
 .nm{display:flex;flex-direction:column;gap:2px}
 .sellb{font-size:12px;color:var(--gold);font-family:var(--mono)}
-.chip.busc{border-color:color-mix(in srgb,var(--copper) 45%,transparent);color:var(--copper);background:var(--copper-soft)}
-.chip.shopc{border-color:color-mix(in srgb,var(--gold) 45%,transparent);color:var(--gold);background:var(--gold-soft)}
+.chip.busc{border-color:var(--copper-line);color:var(--copper);background:var(--copper-soft)}
+.chip.shopc{border-color:var(--gold-line);color:var(--gold);background:var(--gold-soft)}
 .where{font-size:14px;max-width:34ch}
 table.items{min-width:1120px}
 .sortb{font:inherit;font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--muted);background:none;border:0;padding:0;cursor:pointer;display:inline-flex;gap:4px;align-items:center}
@@ -125,12 +125,12 @@ table.ingt td,table.ingt th{padding:6px 10px}
 .st.maybe{background:var(--verd-soft);color:var(--verd);border:1px dashed var(--verd)}
 .st.no{background:var(--slate-soft);color:var(--slate)}
 .mine{font-size:12px;color:var(--muted);margin-top:3px}
-.chip.resc{border-color:color-mix(in srgb,var(--verd) 45%,transparent);color:var(--verd);background:var(--verd-soft)}
+.chip.resc{border-color:var(--verd-line);color:var(--verd);background:var(--verd-soft)}
 .legendlist{margin:0;padding:0;list-style:none;display:grid;gap:6px}
 .legendlist li{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:baseline;font-size:14px}
 .sep{flex-basis:8px}
 .bad{color:var(--copper);font-weight:700}
-.choices{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--gold-soft);border:1px solid color-mix(in srgb,var(--gold) 40%,transparent);border-radius:6px;padding:10px 14px}
+.choices{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--gold-soft);border:1px solid var(--gold-line);border-radius:6px;padding:10px 14px}
 .chip.pick{background:var(--surface);display:inline-flex;gap:6px;align-items:center;padding:2px 4px 2px 8px}
 .chip.pick .x{font:inherit;border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:0 4px}
 .chip.pick .x:hover{color:var(--copper)}
@@ -148,7 +148,7 @@ tr.itemhead th{white-space:nowrap}
 .boardhead{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .boardhead .resetbtn{margin-left:0}.boardhead .resetbtn:first-of-type{margin-left:auto}
 .tags{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
-.tagbox{border:1px solid color-mix(in srgb,var(--gold) 40%,transparent);background:var(--gold-soft);border-radius:6px;padding:8px 10px;display:grid;gap:6px;align-content:start}
+.tagbox{border:1px solid var(--gold-line);background:var(--gold-soft);border-radius:6px;padding:8px 10px;display:grid;gap:6px;align-content:start}
 .taghead{display:flex;gap:8px;align-items:center}
 .taghead .tagname{font-weight:600;width:130px;padding:3px 7px}
 .taghead .deltag{font:inherit;font-size:13px;margin-left:auto;background:none;border:0;color:var(--muted);cursor:pointer;text-decoration:underline}
@@ -158,8 +158,8 @@ tr.itemhead th{white-space:nowrap}
 .addtagrow .resetbtn{margin-left:0}
 select.pick{font-size:13px;padding:3px 6px;display:block}
 table.items td.act .swap{display:block;margin-top:4px}
-.chip.furnc{border-color:color-mix(in srgb,var(--copper) 45%,transparent);color:var(--copper);background:var(--copper-soft)}
-.chip.nursc{border-color:color-mix(in srgb,var(--verd) 45%,transparent);color:var(--verd);background:var(--verd-soft)}
+.chip.furnc{border-color:var(--copper-line);color:var(--copper);background:var(--copper-soft)}
+.chip.nursc{border-color:var(--verd-line);color:var(--verd);background:var(--verd-soft)}
 .pane{display:grid;gap:14px;min-width:0}
 .pane>*{min-width:0}
 .stepn{display:inline-block;min-width:18px;height:18px;line-height:18px;margin-right:7px;border-radius:999px;background:var(--line);color:var(--ink);font-size:12px;font-weight:700;text-align:center;font-family:var(--mono)}
@@ -309,7 +309,7 @@ svg.bylines marker path{fill:currentColor;stroke:none;stroke-dasharray:none}
 .flow.drag{cursor:grabbing;user-select:none}
 .zw{position:absolute;left:0;top:0;transform-origin:0 0;margin:0;min-width:0;width:max-content}
 /* table headings stay at the top of the window while their table is scrolling past, like frozen rows in a spreadsheet */
-@media (min-width:980px){.tablebox{overflow:clip}}
+@media (min-width:980px){.tablebox{overflow:visible}}
 th{z-index:5;box-shadow:0 1px 0 var(--line)}
 /* a long table scrolls inside its own box, under a heading row that never moves */
 .tablebox{overflow:auto;max-height:min(calc(100vh - 16px),860px)}
@@ -344,7 +344,7 @@ html{scroll-snap-type:none}
 .tablebox,#pane-items>.tablebox,#pane-rates>.tablebox,#pane-mods .detail>.tablebox{max-height:none;height:auto;overflow:auto;scroll-snap-align:none}
 #pane-items>.controls,#pane-rates>.controls{scroll-snap-align:none}
 @media (min-width:980px){
-  .tablebox,#pane-items>.tablebox,#pane-rates>.tablebox,#pane-mods .detail>.tablebox{overflow:clip}
+  .tablebox,#pane-items>.tablebox,#pane-rates>.tablebox,#pane-mods .detail>.tablebox{overflow:visible}
   th{position:sticky;top:0;z-index:5}
   #pane-items>.controls,#pane-rates>.controls{position:sticky;top:0;z-index:6;background:var(--ground);padding:8px 0;margin:-8px 0}
   #pane-items>.tablebox th,#pane-rates>.tablebox th{top:var(--toolh,0px)}
@@ -380,8 +380,7 @@ svg.bytext text.hl{fill:var(--copper);font-size:14px}
 /* the eye on a box, and the bar that says the tree is cut down */
 .eye{position:absolute;top:4px;right:4px;border:0;background:none;color:var(--muted);cursor:pointer;padding:3px;line-height:0;border-radius:4px}
 .eye:hover{color:var(--verd);background:var(--surface)}
-.node:has(.eye){padding-right:26px}
-.focusbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--verd-soft);border:1px solid color-mix(in srgb,var(--verd) 40%,transparent);border-radius:6px;padding:8px 12px;font-size:14px}
+.focusbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--verd-soft);border:1px solid var(--verd-line);border-radius:6px;padding:8px 12px;font-size:14px}
 .focusbar[hidden]{display:none}
 .focusbar .resetbtn{margin-left:auto}
 /* line thickness follows --lw, which the script raises as the tree is zoomed out */
@@ -392,3 +391,10 @@ svg.bytext text.hl{fill:var(--copper);font-size:14px}
 .stub{height:var(--lw,2px)}
 svg.bylines>path.vis{stroke-width:var(--lw,2px)}
 svg.bylines>path.vis.hl{stroke-width:calc(var(--lw,2px)*1.75)}
+/* BROWSER SUPPORT: only features every current browser has (the build checks this). */
+:root{--verd-line:#2B766466;--copper-line:#A95A2266;--gold-line:#8A6A1266}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--verd-line:#62C1A966;--copper-line:#E3945C66;--gold-line:#D8B64E66}}
+:root[data-theme="dark"]{--verd-line:#62C1A966;--copper-line:#E3945C66;--gold-line:#D8B64E66}
+.node.haseye{padding-right:26px}
+.flow.drag{-webkit-user-select:none;user-select:none}
+@media (min-width:980px){.tablebox,#pane-items>.tablebox,#pane-rates>.tablebox,#pane-mods .detail>.tablebox{overflow:visible}}

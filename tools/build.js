@@ -32,6 +32,9 @@ const strip = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const must = (cond, msg) => { if (!cond) { console.error('Smoke test failed: ' + msg); process.exit(1); } };
 // a stylesheet that closes its own <style> tag, or contains script, spills onto the page as text
 must(!/<\/style|<script|readFileSync|require\(/i.test(css), 'src/style.css contains something that is not CSS');
+// only features every current browser has: these have each caused, or would cause, a difference between browsers
+for (const bad of ['color-mix(', ':has(', 'overflow:clip', '@container']) must(!css.includes(bad), 'src/style.css uses ' + bad + ', which not every current browser supports');
+for (const bad of ['inputType', 'movementX', 'movementY', ':scope']) must(!ui.includes(bad), 'src/ui.js relies on ' + bad + ', which browsers handle differently');
 must(els.rows.innerHTML.includes('Coke Powder'), 'bus table did not render');
 must(els['pane-setup'].hidden === false && els.ctx.hidden === true, 'a first visit should open on the setup page');
 must(/14×14×15 tiles/.test(els.ctxtxt.textContent), 'the setup reminder line is missing');
@@ -40,7 +43,7 @@ api.openMod('Jupiter');
 must(/Flax 360\/min/.test(strip(els.ingr.innerHTML)), 'Jupiter ingredients did not render');
 must(/Advanced Fertilizer.*12\/min/.test(strip(els.busin.innerHTML)), 'Jupiter bus inputs are wrong');
 must(els.rate.step == 0.01, 'below one, the output should step by 0.01: ' + els.rate.step);
-els.rate.value = '1'; els.rate.oninput(); els.rate.value = '0'; els.rate.oninput({});
+els.rate.value = '1'; els.rate.oninput(); els.rate.value = '0'; els.rate.oninput();
 must(els.rate.value == 0.99, 'stepping down from 1 should land on 0.99: ' + els.rate.value);
 { const t = strip(els.mrows.innerHTML); must(t.indexOf('Nursery') < t.indexOf('Grinder') && t.indexOf('Grinder') < t.indexOf('Processor') && t.indexOf('Processor') < t.indexOf('Shaper'), 'machines should be listed in build order: ' + t.slice(0, 200)); }
 must(els.ingr.innerHTML.lastIndexOf('<b>') === els.ingr.innerHTML.indexOf('<b>Jupiter</b>'), 'the finished item should be the last box');

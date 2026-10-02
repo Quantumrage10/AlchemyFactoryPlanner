@@ -176,7 +176,7 @@ function renderBoard(){ const made=modNames(), st={}; for(const n of made) st[n]
 // Frozen headings, the standard way: the page is the only thing that scrolls, each table's heading row sticks to the
 // top of the window while its table is on screen, and a search row above a table sticks just above the heading.
 // The stylesheet does the sticking; all the script does is tell it how tall each search row is.
-function fitTables(){ for(const k of ["items","rates"]){ const pane=$("pane-"+k), c=pane.querySelector?pane.querySelector(":scope>.controls"):null; if(c&&c.offsetParent) pane.style.setProperty("--toolh",c.offsetHeight+"px"); } }
+function fitTables(){ for(const k of ["items","rates"]){ const pane=$("pane-"+k), c=pane.children?Array.from(pane.children).find(x=>x.classList&&x.classList.contains("controls")):null; if(c&&c.offsetParent) pane.style.setProperty("--toolh",c.offsetHeight+"px"); } }
 if(window.addEventListener) window.addEventListener("resize",fitTables);
 const TABS=["setup","items","mods","rates"];
 function setTab(w){ for(const k of TABS){ $("tab-"+k).setAttribute("aria-selected",k===w); $("pane-"+k).hidden=k!==w; } $("ctx").hidden=w==="setup"; if(w==="mods") layoutTree(); fitTables(); }
@@ -323,9 +323,9 @@ $("ingr").addEventListener("wheel",e=>{ const flow=$("ingr"), zw=flow.firstEleme
   const r=flow.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
   treeX=mx-(mx-treeX)*z/old; treeY=my-(my-treeY)*z/old; treeZoom=z; placeTree(false); frameTree(); },{passive:false});
 // Dragging moves the tree inside its window, in whichever directions it is bigger than the window.
-{ let drag=false; const flow=$("ingr");
-  flow.addEventListener("pointerdown",e=>{ if(e.button!==0) return; frameTree(); if(e.target.closest("button")) return; drag=true; flow.classList.add("drag"); flow.setPointerCapture&&flow.setPointerCapture(e.pointerId); });
-  flow.addEventListener("pointermove",e=>{ if(!drag) return; treeX+=e.movementX; treeY+=e.movementY; placeTree(false); });
+{ let drag=false, lastX=0, lastY=0; const flow=$("ingr");
+  flow.addEventListener("pointerdown",e=>{ if(e.button!==0) return; frameTree(); if(e.target.closest("button")) return; drag=true; lastX=e.clientX; lastY=e.clientY; flow.classList.add("drag"); flow.setPointerCapture&&flow.setPointerCapture(e.pointerId); });
+  flow.addEventListener("pointermove",e=>{ if(!drag) return; treeX+=e.clientX-lastX; treeY+=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY; placeTree(false); });
   const stop=()=>{ drag=false; flow.classList.remove("drag"); }; flow.addEventListener("pointerup",stop); flow.addEventListener("pointercancel",stop); }
 $("treereset").onclick=()=>{ treeFresh=true; layoutTree(); };
 // Lines you can point at. Hovering a line lights up the line and the boxes it joins: for a solid line, the item and
@@ -507,7 +507,7 @@ function renderMod(){
       if(fromBus){ src='<span class="src bus">Off the bus</span>'; cls="bus"; act=s.mine?btn("","Undo my choice"):btn("off","Keep it off the bus"); if(!s.mine&&L.forcedBy[n]&&L.forcedBy[n].includes(root)) mark=' <small class="mut">(won\'t fit otherwise)</small>'; }
       else { src='<span class="src here">Made here</span>'; act=s.mine?btn("","Undo my choice"):btn("bus","Put it on the bus"); if(s.code==="maybe") mark=' <small class="mut">(a maybe)</small>'; }
       if(s.mine) mark=' <small class="mut">(your choice)</small>'; }
-    return '<div class="node '+cls+'" data-id="'+id+'" data-n="'+esc(n)+'"><div><b>'+esc(n)+'</b> <span class="amt">'+fmt(amt)+'/min</span></div><div>'+src+mark+'</div>'+act+(eye?'<button class="eye" data-eye="'+id+'" data-n="'+esc(n)+'" title="Show only what goes into '+esc(n)+'" aria-label="Show only what goes into '+esc(n)+'">'+EYE+'</button>':"")+'</div>'; };
+    return '<div class="node '+cls+(eye?' haseye':'')+'" data-id="'+id+'" data-n="'+esc(n)+'"><div><b>'+esc(n)+'</b> <span class="amt">'+fmt(amt)+'/min</span></div><div>'+src+mark+'</div>'+act+(eye?'<button class="eye" data-eye="'+id+'" data-n="'+esc(n)+'" title="Show only what goes into '+esc(n)+'" aria-label="Show only what goes into '+esc(n)+'">'+EYE+'</button>':"")+'</div>'; };
   // a tree, read left to right: every item sits to the right of what goes into it, joined by lines, and the
   // finished item is at the far right. Something used in several places shows up in each, with the amount that place needs.
   byArrows=[]; let nid=0;
@@ -548,9 +548,10 @@ function renderMod(){
   }}
   $("notes").innerHTML=notes.length?`<div class="box"><h3>Byproducts: the only things that can stall this module</h3><ul class="notes">${notes.join("")}</ul><p class="fitsub">Everything else is safe to over-build.</p></div>`:"";
 }
-// stepping down from exactly 1 lands on 0.99, not 0 (typing a 0 yourself is left alone). The arrows report themselves
-// differently in different browsers: no input type in Chrome, "insertReplacementText" in Firefox.
-$("rate").oninput=e=>{ if(lastRate===1&&+$("rate").value===0&&$("rate").value!==""&&(!e||!e.inputType||e.inputType==="insertReplacementText")) $("rate").value=0.99; renderMod(); };
+// Stepping down from exactly 1 lands on 0.99, not 0. Typing a 0 yourself is left alone: a change counts as typed when a
+// key other than the up and down arrows was pressed in the box just before it. That works the same in every browser.
+{ let typedAt=0; $("rate").onkeydown=e=>{ if(e.key!=="ArrowUp"&&e.key!=="ArrowDown") typedAt=Date.now(); };
+  $("rate").oninput=()=>{ const el=$("rate"); if(lastRate===1&&el.value!==""&&+el.value===0&&Date.now()-typedAt>400) el.value=0.99; renderMod(); }; }
 $("fit").addEventListener("click",e=>{ const x=e.target.closest("[data-rate]"); if(x){ $("rate").value=+(+x.dataset.rate).toPrecision(6); renderMod(); } });
 $("ingr").addEventListener("click",e=>{ const b=e.target.closest(".swap"); if(b) decide(b.dataset.item,b.dataset.to||null); });
 
