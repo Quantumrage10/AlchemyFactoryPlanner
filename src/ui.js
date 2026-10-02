@@ -7,7 +7,7 @@ function fmt(x){ if(!isFinite(x)) return "—"; if(Math.abs(x)<1e-9) return "0";
 const coinOf=c=>c<1000?["copper",c]:c<100000?["silver",c/1000]:["gold",c/100000];
 const money=c=>{ const [u,v]=coinOf(c); return fmt(v)+" "+u; };
 // the same amount with a little drawn coin beside it (word=true also spells the coin out); hovering shows it in full
-const coinHtml=(c,word)=>{ const [u,v]=coinOf(c); return '<span class="money" title="'+money(c)+(c>=1000?" ("+Math.round(c).toLocaleString()+" copper)":"")+'">'+fmt(v)+' <i class="coin c-'+u+'"></i>'+(word?" "+u:"")+"</span>"; };
+const coinHtml=(c,word)=>{ const [u,v]=coinOf(c); return '<span class="money" title="'+money(c)+(c>=1000?" ("+Math.round(c).toLocaleString()+" copper)":"")+'">'+fmt(v)+' <i class="cicon c-'+u+'"></i>'+(word?" "+u:"")+"</span>"; };
 const plural=(n,w)=>n+" "+(n===1?w:(/y$/.test(w)?w.slice(0,-1)+"ies":(/s$/.test(w)?w:w+"s")));
 const listAnd=a=>a.length<=1?a.join(""):a.length===2?a.join(" and "):a.slice(0,-1).join(", ")+" and "+a[a.length-1];
 $("ver").textContent="game "+DATA.version;

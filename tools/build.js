@@ -33,6 +33,8 @@ const must = (cond, msg) => { if (!cond) { console.error('Smoke test failed: ' +
 // a stylesheet that closes its own <style> tag, or contains script, spills onto the page as text
 must(!/<\/style|<script|readFileSync|require\(/i.test(css), 'src/style.css contains something that is not CSS');
 // only features every current browser has: these have each caused, or would cause, a difference between browsers
+// the drawn coin has its own class; .coin belongs to the bought-with-coins boxes and tags in the tree
+must(!css.includes('.coin{display:inline-block') && !css.includes('.coin{width') && !ui.includes('class="coin c-'), 'the coin icon must use the cicon class, not coin');
 for (const bad of ['color-mix(', ':has(', 'overflow:clip', '@container']) must(!css.includes(bad), 'src/style.css uses ' + bad + ', which not every current browser supports');
 for (const bad of ['inputType', 'movementX', 'movementY', ':scope']) must(!ui.includes(bad), 'src/ui.js relies on ' + bad + ', which browsers handle differently');
 must(els.rows.innerHTML.includes('Coke Powder'), 'bus table did not render');
@@ -76,7 +78,7 @@ doc.getElementById('lvlfert').value = '0'; doc.getElementById('lvlfert').oninput
 // sales ability: one level is +25%, so brick's 70 becomes 87.5
 doc.getElementById('lvlsell').value = '1'; doc.getElementById('lvlsell').oninput();
 must(/87\.5/.test(strip(els.rows.innerHTML)), 'sales ability did not raise prices by 25%');
-must(els.rows.innerHTML.includes('37.5 <i class="coin c-silver">') && els.rows.innerHTML.includes('37,500 copper'), 'prices should show in the right coin, with the full copper amount on hover');
+must(els.rows.innerHTML.includes('37.5 <i class="cicon c-silver">') && els.rows.innerHTML.includes('37,500 copper'), 'prices should show in the right coin, with the full copper amount on hover');
 doc.getElementById('lvlsell').value = '0'; doc.getElementById('lvlsell').oninput();
 // a different fuel: blast potion is far hotter than coke powder, so a glass module needs far less of it
 api.openMod('Glass');
