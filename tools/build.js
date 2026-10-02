@@ -46,6 +46,10 @@ must(els.rate.value == 0.99, 'stepping down from 1 should land on 0.99: ' + els.
 must(els.ingr.innerHTML.lastIndexOf('<b>') === els.ingr.innerHTML.indexOf('<b>Jupiter</b>'), 'the finished item should be the last box');
 { const t = strip(els.ingr.innerHTML); must((t.match(/Logs /g) || []).length === 3, 'planks go into the pulley, the gears and Jupiter itself, so logs and planks should show three times: ' + t); }
 api.openMod('Saturn');
+// salt's Athanor gives off sand; with salt, brick and glass all made inside, that sand feeds the glass and clay and no sand is ground
+api.setPlace('Salt', 'off'); api.setPlace('Brick', 'off'); api.setPlace('Glass', 'off'); api.openMod('Saturn');
+{ const t = strip(els.ingr.innerHTML), m = strip(els.mrows.innerHTML); must(!/Sand [0-9.,]+.min/.test(t), 'sand is a byproduct of the salt, so it should have no box and nothing ground for it: ' + t.slice(0, 400)); must(!/Grinder Sand/.test(m), 'a machine that is not needed should not be listed: ' + m); }
+api.setPlace('Salt', null); api.setPlace('Brick', null); api.setPlace('Glass', null); api.openMod('Saturn');
 // Saturn opens at the biggest size that fits, 0.4/min: two stations each for salt, brick and glass, plus one out
 must(els.rate.value == 0.4, 'Saturn did not open at its biggest fitting size: ' + els.rate.value);
 must(/Total 7 of 8/.test(strip(els.conn.innerHTML)), 'Saturn bus connections are wrong');

@@ -280,3 +280,21 @@ table.items td.act .swap{display:block;margin-top:4px}
 .droplist{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;max-height:300px;overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
 .droplist:not([hidden]){display:flex}
 .droplist[hidden]{display:none}
+/* byproduct arrows sit behind the boxes; their labels sit on top */
+.flow{position:relative;padding-bottom:24px}
+.flow .node{position:relative;z-index:1}
+svg.bylines,svg.bytext{position:absolute;left:0;top:0;pointer-events:none;color:var(--gold)}
+svg.bylines{z-index:0}
+svg.bytext{z-index:2}
+svg.bylines path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
+svg.bylines>path{stroke-dasharray:6 4}
+svg.bytext text{font-family:var(--sans);font-size:12.5px;font-weight:600;fill:var(--gold);paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
+svg.bylines marker path{fill:currentColor;stroke:none;stroke-dasharray:none}
+/* a box fed only by a byproduct sits next to what it feeds, so its arrow is short */
+.kids>.branch.tail{justify-content:flex-end}
+.kids>.branch.tail::after{flex:0 0 22px}
+.flow{overflow-y:hidden}
+/* a box fed only by a byproduct is moved by the script to sit under or over the machine it comes from */
+.kids>.branch.tail{justify-content:flex-start}
+.kids>.branch.tail::after{flex:1 1 22px}
+.flow{padding-top:14px}

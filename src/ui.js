@@ -244,8 +244,43 @@ function chain(root,cs){ const depth={}, into={}, kids={};
   return {depth,into,order,pos:Object.fromEntries(order.map((n,i)=>[n,i]))}; }
 // Lines up the ingredient tree once the browser has sized the boxes. Each row keeps its own height; an item is then
 // lined up with the middle line feeding it (or midway between the middle two), so that line runs straight through.
+// Byproduct arrows, drawn once the boxes are in place: a dashed line from the box of the machine a byproduct comes
+// out of to the box that uses it. It leaves the top or bottom of one box and enters the top or bottom of the other,
+// running behind any box in between; when both are in the same row it loops underneath.
+let byArrows=[];
+function drawBy(){ const flow=$("ingr"), svg=flow.querySelector("svg.bylines"), txt=flow.querySelector("svg.bytext"); if(!svg||!txt) return;
+  const fr=flow.getBoundingClientRect(), W=flow.scrollWidth, H=flow.scrollHeight;
+  for(const s of [svg,txt]){ s.setAttribute("width",W); s.setAttribute("height",H); s.setAttribute("viewBox","0 0 "+W+" "+H); }
+  const nodes=Array.from(flow.querySelectorAll(".node")); const box=e=>{ const r=e.getBoundingClientRect(); return {l:r.left-fr.left+flow.scrollLeft,t:r.top-fr.top+flow.scrollTop,w:r.width,h:r.height}; };
+  let lines='<defs><marker id="byhead" markerWidth="10" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L10 6L0 12Z" fill="currentColor"/></marker></defs>', labels="";
+  const used={};
+  for(const a of byArrows){ const pe=nodes.find(e=>e.dataset.n===a.from), te=nodes.find(e=>e.dataset.id===String(a.to)); if(!pe||!te) continue; const p=box(pe), t=box(te);
+    const k=used[a.from]=(used[a.from]||0)+1, ol=Math.max(p.l,t.l), or=Math.min(p.l+p.w,t.l+t.w); let d, lx, ly;
+    if(pe!==te&&or-ol>=30){
+      // one box sits over the other: straight up or straight down, label halfway along
+      const x=Math.round((ol+or)/2), up=t.t<p.t, y0=Math.round(up?p.t:p.t+p.h), y1=Math.round(up?t.t+t.h+1:t.t-1);
+      d="M"+x+" "+y0+"V"+y1; lx=x; ly=Math.round((y0+y1)/2)+4; }
+    else {
+      // otherwise: out of the right side of the machine it comes from, along the gap between rows, and into the left
+      // side of what uses it. It leaves and arrives above or below the main line, never on top of it.
+      const above=t.t+t.h<=p.t-14, below=t.t>=p.t+p.h+14;
+      // when both are in the same row the line goes over the top, clear of every box it passes on the way
+      let over=Math.min(p.t,t.t); if(!above&&!below){ const xl=Math.min(p.l,t.l), xr=Math.max(p.l+p.w,t.l+t.w), yb=Math.max(p.t+p.h,t.t+t.h);
+        for(const e of nodes){ const b=box(e); if(b.l<xr&&b.l+b.w>xl&&b.t<yb&&b.t+b.h>over-30) over=Math.min(over,b.t); } }
+      const lane=Math.round(above?t.t+t.h+7:(below?t.t-7:over-7));
+      const py=Math.round(lane<p.t+p.h/2?p.t+p.h*0.25:p.t+p.h*0.75), ty=Math.round(lane<t.t+t.h/2?t.t+t.h*0.25:t.t+t.h*0.75);
+      const x0=Math.round(p.l+p.w), xa=x0+10+6*(k-1), xb=Math.round(t.l)-14, x1=Math.round(t.l)-1;
+      d="M"+x0+" "+py+"H"+xa+"V"+lane+"H"+xb+"V"+ty+"H"+x1; lx=Math.round((xa+xb)/2); ly=lane+4; }
+    lines+='<path d="'+d+'" marker-end="url(#byhead)"/>';
+    labels+='<text x="'+lx+'" y="'+ly+'" text-anchor="middle">'+esc(a.item)+' '+fmt(a.amt)+'/min</text>'; }
+  svg.innerHTML=lines; txt.innerHTML=labels; }
 function layoutTree(){ const top=$("ingr").firstElementChild; if(!top||!top.getBoundingClientRect||$("pane-mods").hidden) return;
-  for(const e of $("ingr").querySelectorAll(".node,.stub,.tri,.kids")) e.style.marginTop="";
+  for(const e of $("ingr").querySelectorAll(".node,.stub,.tri,.kids")){ e.style.marginTop=""; e.style.marginLeft=""; }
+  { const nodes=Array.from($("ingr").querySelectorAll(".node"));
+    for(const a of byArrows){ const pe=nodes.find(e=>e.dataset.n===a.from), te=nodes.find(e=>e.dataset.id===String(a.to)); if(!pe||!te) continue;
+      const br=te.parentElement; if(!br.classList.contains("tail")) continue;
+      const dx=pe.getBoundingClientRect().left-te.getBoundingClientRect().left, room=br.getBoundingClientRect().width-te.getBoundingClientRect().width-22;
+      if(dx>0) te.style.marginLeft=Math.round(Math.min(dx,Math.max(0,room)))+"px"; } }
   const kid=(b,c)=>Array.from(b.children).filter(e=>e.classList.contains(c));
   const fix=b=>{ const node=kid(b,"node")[0], ks=kid(b,"kids")[0], bt=()=>b.getBoundingClientRect().top;
     if(!ks){ const r=node.getBoundingClientRect(); return Math.round(r.top+r.height/2-bt()); }
@@ -254,7 +289,7 @@ function layoutTree(){ const top=$("ingr").firstElementChild; if(!top||!top.getB
     const need=node.getBoundingClientRect().height/2+pad-mid; if(need>0){ ks.style.marginTop=Math.ceil(need)+"px"; mid+=Math.ceil(need); }
     for(const e of [node,...kid(b,"stub"),...kid(b,"tri")]) e.style.marginTop=Math.round(mid-pad-e.getBoundingClientRect().height/2)+"px";
     return mid; };
-  fix(top); }
+  fix(top); drawBy(); }
 if(window.addEventListener) window.addEventListener("resize",layoutTree);
 if(document.fonts&&document.fonts.ready) document.fonts.ready.then(layoutTree);
 function renderMod(){
@@ -315,7 +350,7 @@ function renderMod(){
 
   // --- ingredients ---
   const G=chain(root,cs), maxD=Math.max(...G.order.map(n=>G.depth[n]));
-  const nodeHtml=(n,amt,isRoot)=>{ const x=I[n]; if(!x) return ""; const fromBus=!isRoot&&cs.has(n);
+  const nodeHtml=(n,amt,isRoot,id)=>{ const x=I[n]; if(!x) return ""; const fromBus=!isRoot&&cs.has(n);
     let src, act="", mark="", cls="made";
     if(isRoot){ src='<span class="src here">Made here</span>'; mark=' <small class="mut">the finished item</small>'; cls="root"; }
     else if(x.liq){ src='<span class="src pipe">Piped here</span>'; cls="pipe"; }
@@ -325,17 +360,23 @@ function renderMod(){
       if(fromBus){ src='<span class="src bus">Off the bus</span>'; cls="bus"; act=s.mine?btn("","Undo my choice"):btn("off","Keep it off the bus"); if(!s.mine&&L.forcedBy[n]&&L.forcedBy[n].includes(root)) mark=' <small class="mut">(won\'t fit otherwise)</small>'; }
       else { src='<span class="src here">Made here</span>'; act=s.mine?btn("","Undo my choice"):btn("bus","Put it on the bus"); if(s.code==="maybe") mark=' <small class="mut">(a maybe)</small>'; }
       if(s.mine) mark=' <small class="mut">(your choice)</small>'; }
-    return '<div class="node '+cls+'"><div><b>'+esc(n)+'</b> <span class="amt">'+fmt(amt)+'/min</span></div><div>'+src+mark+'</div>'+act+'</div>'; };
+    return '<div class="node '+cls+'" data-id="'+id+'" data-n="'+esc(n)+'"><div><b>'+esc(n)+'</b> <span class="amt">'+fmt(amt)+'/min</span></div><div>'+src+mark+'</div>'+act+'</div>'; };
   // a tree, read left to right: every item sits to the right of what goes into it, joined by lines, and the
   // finished item is at the far right. Something used in several places shows up in each, with the amount that place needs.
-  const tree=(n,q,d)=>{ const isRoot=d===0, r=R[n], leaf=d>40||!r||I[n].kind==="raw"||(!isRoot&&cs.has(n));
-    let kids=""; if(!leaf){ const crafts=q/(r.outs[n]*C.yieldOf(r)); const ks=Object.keys(r.ins).filter(i=>I[i]).sort((x,y)=>(G.pos[x]??0)-(G.pos[y]??0));
-      if(ks.length) kids='<div class="kids">'+ks.map(i=>tree(i,crafts*r.ins[i],d+1)).join("")+'</div><div class="stub" aria-hidden="true"></div><div class="tri" aria-hidden="true"></div>'; }
-    return '<div class="branch">'+kids+nodeHtml(n,q,isRoot)+'</div>'; };
-  $("ingr").innerHTML=tree(root,rate,0); layoutTree();
+  byArrows=[]; let nid=0;
+  const tree=(n,q,d,parent)=>{ const isRoot=d===0, r=R[n], cut=!isRoot&&cs.has(n), id=++nid;
+    let by=null; if(!isRoot&&!cut&&sol.recycled[n]>1e-9&&sol.flows[n]>1e-9){ const from=Object.keys(sol.flows).find(p=>p!==n&&R[p]&&R[p].outs[n]!=null&&I[p].kind!=="raw");
+      if(from){ const f=Math.min(1,sol.recycled[n]/sol.flows[n]); by={amt:q*f,from,full:f>0.999}; byArrows.push({from,item:n,amt:by.amt,to:by.full?parent:id}); if(by.full){ nid--; return ""; } } }
+    const leaf=d>40||!r||I[n].kind==="raw"||cut||(by&&by.full), mq=by?q-by.amt:q;
+    let kids="", tail=false; if(!leaf){ const crafts=mq/(r.outs[n]*C.yieldOf(r)); const ks=Object.keys(r.ins).filter(i=>I[i]).sort((x,y)=>(G.pos[x]??0)-(G.pos[y]??0));
+      const inner=ks.map(i=>tree(i,crafts*r.ins[i],d+1,id)).join("");
+      tail=!inner&&ks.length>0;
+      if(inner) kids='<div class="kids">'+inner+'</div><div class="stub" aria-hidden="true"></div><div class="tri" aria-hidden="true"></div>'; }
+    return '<div class="branch'+(tail?' tail':'')+'">'+kids+nodeHtml(n,q,isRoot,id)+'</div>'; };
+  $("ingr").innerHTML=tree(root,rate,0,0)+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg>'; layoutTree();
 
   // --- machines ---
-  $("mrows").innerHTML=sol.list.slice().sort((a,b)=>(G.pos[a.item]??999)-(G.pos[b.item]??999)).map(m=>{ const n=m.count, b=Math.ceil(n-1e-9), busy=b?n/b*100:0;
+  $("mrows").innerHTML=sol.list.filter(m=>m.count>1e-9).sort((a,b)=>(G.pos[a.item]??999)-(G.pos[b.item]??999)).map(m=>{ const n=m.count, b=Math.ceil(n-1e-9), busy=b?n/b*100:0;
     return `<tr><td>${esc(m.machine)}${m.heat?'<span class="heat">HEAT</span>':""}</td><td>${esc(m.out)}</td><td class="num">${fmt(m.each)}/min${m.capped?' <small class="mut">belt cap</small>':""}</td><td class="num">${fmt(n)}</td><td class="num">${b}</td><td class="num ${busy<99.5?"idle":""}">${b?Math.round(busy)+"%":"—"}</td></tr>`; }).join("");
   const tot=sol.list.reduce((a,m)=>a+Math.ceil(m.count-1e-9),0); const vv=C.volume(sol);
   $("mtot").textContent=plural(tot,"machine")+(vv.furn?" plus "+plural(vv.furn,"stone furnace")+" for heat":"");
@@ -343,7 +384,9 @@ function renderMod(){
   // --- byproducts ---
   const notes=[];
   for(const m of sol.list){ for(const o of m.out.split(" + ").slice(1)){
-    if(sol.recycled[o]>1e-9){ const mk=sol.list.find(x=>x.item===o); notes.push(`<li><b>${esc(o)} comes back out of the ${esc(m.machine)}</b> (${fmt(sol.recycled[o])}/min is reused here). Merge it in with a <b>priority merger, recycled ${esc(o)} first</b>${mk?`, ahead of the ${esc(o)} from the ${esc(mk.machine)}`:""}. Otherwise fresh supply fills the line, the ${esc(m.machine)} can't get rid of its ${esc(o)}, and it stops.</li>`); }
+    if(sol.recycled[o]>1e-9){ const mk=sol.list.find(x=>x.item===o&&x.count>1e-9);
+      if(mk) notes.push('<li><b>'+esc(o)+' comes back out of the '+esc(m.machine)+'</b> ('+fmt(sol.recycled[o])+'/min is reused here). Merge it in with a <b>priority merger, recycled '+esc(o)+' first</b>, ahead of the '+esc(o)+' from the '+esc(mk.machine)+'. Otherwise fresh supply fills the line, the '+esc(m.machine)+' can\'t get rid of its '+esc(o)+', and it stops.</li>');
+      else notes.push('<li><b>'+esc(o)+' comes out of the '+esc(m.machine)+'</b> ('+fmt(sol.recycled[o])+'/min is used here). Nothing else in this module makes '+esc(o)+', so there is nothing to merge it with: send it straight to the machines that need it.</li>'); }
     if(sol.spare[o]>1e-9) notes.push(`<li><b>${fmt(sol.spare[o])}/min of spare ${esc(o)} comes out of the ${esc(m.machine)}.</b> It needs somewhere to go, like knowledge altars on the overflow side of a priority splitter, or the ${esc(m.machine)} backs up and stops.</li>`);
   }}
   $("notes").innerHTML=notes.length?`<div class="box"><h3>Byproducts: the only things that can stall this module</h3><ul class="notes">${notes.join("")}</ul><p class="fitsub">Everything else is safe to over-build. A machine with nowhere to send its output just waits.</p></div>`:"";
