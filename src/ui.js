@@ -38,8 +38,8 @@ const inTier=n=>I[n]&&I[n].tier<=tierMax();
 // What we recommend is only the starting layout. plan.place holds what you have changed (item -> "off", "maybe",
 // "own" or "tag:<id>"), plan.tags the shared wagon types, and plan.cleared means nothing is recommended at all.
 const DEFAULT_TAGS=()=>[{id:"research",name:"research"},{id:"fuel",name:"fuel"},{id:"fert",name:"fertilizer"},{id:"shop",name:"shop"}];
-const TAGNOTE={research:"Relics. Research and the shop take any of them.",fuel:"Anything that burns. A furnace takes whichever one turns up.",fert:"Anything that feeds a nursery. A nursery takes whichever one turns up.",
-  shop:"Things that are only sold and used nowhere else. Don't run it as a ring: unload everything at the shop and send whatever is left to knowledge altars."};
+const TAGNOTE={research:"Relics. Research and the shop take any of them.",fuel:"Anything that burns.",fert:"Anything that feeds a nursery.",
+  shop:"Things that are only sold. Unload it all at the shop and send what's left to knowledge altars."};
 let plan={place:{},tags:DEFAULT_TAGS(),cleared:false};
 try{ const sv=JSON.parse(localStorage.getItem("bsp_plan_v1")||"null");
   if(sv&&typeof sv==="object"){ if(sv.place&&typeof sv.place==="object") plan.place=sv.place; if(Array.isArray(sv.tags)) plan.tags=sv.tags.filter(t=>t&&t.id&&t.name); plan.cleared=!!sv.cleared; }
@@ -69,36 +69,36 @@ function line(){ const k=tierMax()+"|"+cap()+"|"+C.belt()+"|"+C.speed()+"|"+C.yi
 // the fertilizer wagon, relics the research wagon. null = none of them.
 function wagonOf(n){ const it=I[n]; if(it.relic) return "research"; const f=it.heat>0, g=it.nutr>0&&it.fspeed>0;
   if(f&&g) return (n===C.fert()&&n!==C.fuel())?"fert":"fuel"; return f?"fuel":g?"fert":null; }
-const SHAREWHY={fuel:" It rides the shared fuel wagon type with everything else that burns.",fert:" It rides the shared fertilizer wagon type with everything else that feeds nurseries."};
+const SHAREWHY={fuel:" Rides the fuel wagon.",fert:" Rides the fertilizer wagon."};
 // What we recommend for an item. code: ded (own wagon type), mix (a shared wagon type; wagon says which), maybe, no
 function rec(n){ const s=statusBase(n); if(s.code==="mix"&&!s.wagon) s.wagon="research";
   if(s.code==="ded"){ const w=wagonOf(n); if(w){ s.code="mix"; s.wagon=w; s.why+=SHAREWHY[w]||""; } }
   if(s.code==="mix"&&!tagById(s.wagon)){ s.code="ded"; delete s.wagon; } return s; }
 // Where an item stands: what you set, or else the recommendation (or nothing, once recommendations are cleared)
 function status(n){ const p=plan.place[n], L=line(), it=I[n];
-  if(p==="off") return {code:"no",mine:true,why:"Your choice. Every module that needs it makes its own."+(L.bus.has(n)&&L.forcedBy[n]?" Check those modules still fit: the "+listAnd(L.forcedBy[n].slice(0,3))+" module didn't have room for it.":"")};
-  if(p==="maybe") return {code:"maybe",mine:true,why:"Your choice. Marked as a maybe. Until you decide, every module that needs it makes its own."};
-  if(p==="own") return {code:"ded",mine:true,why:"Your choice. It gets its own tagged wagons, and every module that needs it takes it off the bus."};
-  if(p&&p.slice(0,4)==="tag:"&&tagById(p.slice(4))){ const t=tagById(p.slice(4)); return {code:"mix",wagon:t.id,mine:true,why:"Your choice. It rides the shared \""+t.name+"\" wagon type, and every module that needs it takes it off that wagon."}; }
-  if(plan.cleared) return {code:"no",why:(it.kind==="made"&&!it.liq)?"Recommendations are cleared. It stays off the bus until you put it somewhere.":"Made or bought right where it's used."};
+  if(p==="off") return {code:"no",mine:true,why:"Your choice. Modules that need it make their own."+(L.bus.has(n)&&L.forcedBy[n]?" Check those modules still fit: the "+listAnd(L.forcedBy[n].slice(0,3))+" module didn't have room for it.":"")};
+  if(p==="maybe") return {code:"maybe",mine:true,why:"Your choice. Modules make their own until you decide."};
+  if(p==="own") return {code:"ded",mine:true,why:"Your choice. Own tagged wagons."};
+  if(p&&p.slice(0,4)==="tag:"&&tagById(p.slice(4))){ const t=tagById(p.slice(4)); return {code:"mix",wagon:t.id,mine:true,why:"Your choice. Rides the "+t.name+" wagon."}; }
+  if(plan.cleared) return {code:"no",why:(it.kind==="made"&&!it.liq)?"Off the bus until you place it.":"Made or bought where it's used."};
   return rec(n); }
 function statusBase(n){
   const it=I[n], L=line(); const users=it.uses.filter(inTier); const made=it.kind==="made"&&!it.liq;
   const usesTxt=listAnd(users.slice(0,4))+(users.length>4?" and others":"");
   if(C.UNIVERSAL.includes(n)){ const isFuel=n===C.fuel(), isFert=n===C.fert();
-    return {code:"ded",why:"Always. It's "+(isFuel&&isFert?"the fuel and the fertilizer":isFuel?"the fuel":"the fertilizer")+" you've picked for "+(isFuel&&isFert?"the whole base":isFuel?"every heated machine":"every nursery")+"."+(users.length?" "+usesTxt+" also use"+(users.length>1?"":"s")+" it as an ingredient.":"")}; }
-  if(it.relic) return {code:"mix",why:"A relic. It only goes to the shop and to research, so it rides one shared \"research\" wagon type with the other relics."+(users.length?" "+usesTxt+" also take"+(users.length>1?"":"s")+" it off that wagon.":"")};
-  if(L.bus.has(n)){ const fb=L.forcedBy[n]||[]; return {code:"ded",why:"The "+listAnd(fb.slice(0,3))+" module"+(fb.length>1?"s":"")+" can't fit making "+(fb.length>1?"their":"its")+" own "+n.toLowerCase()+" in one tile."}; }
-  if(made&&!it.uses.length&&wagonOf(n)) return {code:"no",why:"Nothing uses it as an ingredient. It's "+(it.heat>0&&it.nutr>0?"a fuel and a fertilizer":it.heat>0?"a fuel":"a fertilizer")+(it.sell?", and it sells":"")+". It stays off the bus until you pick it on the setup page or put it on a wagon yourself."};
-  if(made&&it.sell&&!it.uses.length) return {code:"mix",wagon:"shop",why:"Only sold, and nothing else uses it. It rides the shared shop wagon type. Unload everything at the shop and send what's left to knowledge altars, or set it to off the bus and make it next to the shop."};
-  if(it.liq) return {code:"no",why:"Hard no. A liquid, piped inside whatever uses it."};
-  if(it.kind==="raw") return {code:"no",why:"Hard no. Bought with coins inside whatever uses it."};
-  if(it.kind==="crop") return {code:"no",why:"Hard no. Grown in nurseries inside whatever uses it."};
-  if(C.onlyFeedsConversion(n)){ const into=it.uses[0]; return {code:"no",why:"No. It only ever gets turned into "+into+", so it's made inside the "+into.toLowerCase()+" module and the "+into.toLowerCase()+" is what moves."+(it.sell?" The shop's share gets made next to the shop.":"")}; }
-  { const src=C.simpleFrom(n); if(src&&inTier(src)){ if(onBus(src)) return {code:"no",why:"No. It's a straight one-for-one conversion of "+src+" in a single "+R[n].machine+". "+src+" is what rides the bus, and you convert it right where it's needed"+(it.sell?", including next to the shop":"")+"."};
-      return {code:"no",why:"No. It's a straight one-for-one conversion of "+src+" in a single "+R[n].machine+". Whatever module needs it grinds its own from the "+src.toLowerCase()+" it already has"+(it.sell?". The shop's share gets made next to the shop.":".")}; } }
-  if(!it.dense) return {code:"no",why:"Hard no. Bulk ("+it.rtxt+"). Make it right where it's used."+(it.sell?" The shop's share gets made next to the shop.":"")};
-  if(users.length) return {code:"maybe",why:"Packed down ("+it.rtxt+"), but "+(users.length<=2?"only ":"just ")+usesTxt+" use"+(users.length>1?"":"s")+" it"+(it.sell?", plus the shop":"")+". Bus it from its own module, or build it into the "+usesTxt+" module"+(users.length>1?"s":"")+(it.sell?" and make the shop's share next to the shop":"")+". Fits either way."};
+    return {code:"ded",why:"Always on the bus: it's "+(isFuel&&isFert?"the fuel and the fertilizer":isFuel?"the fuel":"the fertilizer")+" you've picked."+(users.length?" Also an ingredient for "+usesTxt+".":"")}; }
+  if(it.relic) return {code:"mix",why:"A relic. Rides the research wagon."+(users.length?" Also an ingredient for "+usesTxt+".":"")};
+  if(L.bus.has(n)){ const fb=L.forcedBy[n]||[]; return {code:"ded",why:"The "+listAnd(fb.slice(0,3))+" module"+(fb.length>1?"s":"")+" can't fit making "+(fb.length>1?"their":"its")+" own "+n.toLowerCase()+"."}; }
+  if(made&&!it.uses.length&&wagonOf(n)) return {code:"no",why:(it.heat>0&&it.nutr>0?"A fuel and a fertilizer":it.heat>0?"A fuel":"A fertilizer")+" that nothing uses as an ingredient. Off the bus unless you pick it in setup or place it yourself."};
+  if(made&&it.sell&&!it.uses.length) return {code:"mix",wagon:"shop",why:"Only sold. Rides the shop wagon."};
+  if(it.liq) return {code:"no",why:"A liquid. Piped where it's used."};
+  if(it.kind==="raw") return {code:"no",why:"Bought with coins where it's used."};
+  if(it.kind==="crop") return {code:"no",why:"Grown where it's used."};
+  if(C.onlyFeedsConversion(n)){ const into=it.uses[0]; return {code:"no",why:"Only ever becomes "+into+", so it's made inside the "+into.toLowerCase()+" module."}; }
+  { const src=C.simpleFrom(n); if(src&&inTier(src)){ if(onBus(src)) return {code:"no",why:"A one-for-one conversion of "+src+". "+src+" rides the bus and is converted where it's needed."};
+      return {code:"no",why:"A one-for-one conversion of "+src+". Made where it's needed."}; } }
+  if(!it.dense) return {code:"no",why:"Bulk ("+it.rtxt+"). Made where it's used."};
+  if(users.length) return {code:"maybe",why:"Packed down ("+it.rtxt+"). Only "+usesTxt+" use"+(users.length>1?"":"s")+" it"+(it.sell?", plus the shop":"")+". Bus it, or build it into "+(users.length>1?"those modules":"that module")+"."};
   if(it.sell) return {code:"no",why:"Only sold. Make it next to the shop."};
   return {code:"no",why:"Nothing at this tier uses it."};
 }
@@ -271,7 +271,7 @@ function applyFocus(){ const bar=$("treefocus"), zw=$("ingr").firstElementChild;
   extra.forEach((a,i)=>{ const cons=Array.from(zw.querySelectorAll(".node")).find(e=>e.dataset.id===String(a.to)); if(!cons) return; const br=cons.parentElement;
     let ks=Array.from(br.children).find(c=>c.classList.contains("kids"));
     if(!ks){ ks=mk("kids"); const st=mk("stub"), tr=mk("tri"); br.insertBefore(tr,cons); br.insertBefore(st,tr); br.insertBefore(ks,st); br.classList.remove("tail"); }
-    const leaf=mk("branch"); leaf.innerHTML='<div class="node pipe" data-id="x'+i+'" data-n="'+esc(a.item)+'"><div><b>'+esc(a.item)+'</b> <span class="amt">'+fmt(a.amt)+'/min</span></div><div><span class="src pipe">Byproduct</span> <small class="mut">comes out of the '+esc(R[a.from].machine)+' making '+esc(a.from)+', in a part of this module that isn\'t shown</small></div></div>';
+    const leaf=mk("branch"); leaf.innerHTML='<div class="node pipe" data-id="x'+i+'" data-n="'+esc(a.item)+'"><div><b>'+esc(a.item)+'</b> <span class="amt">'+fmt(a.amt)+'/min</span></div><div><span class="src pipe">Byproduct</span> <small class="mut">comes out of the '+esc(R[a.from].machine)+' making '+esc(a.from)+', elsewhere in this module</small></div></div>';
     ks.appendChild(leaf); });
   byArrows=keep; $("treefocusname").textContent=treeFocus.n; bar.hidden=false; }
 $("ingr").addEventListener("click",e=>{ const b=e.target.closest&&e.target.closest(".eye"); if(!b) return; treeFocus={id:b.dataset.eye,n:b.dataset.n}; treeFresh=true; $("treetip").hidden=true; renderMod(); });
@@ -366,7 +366,7 @@ $("treereset").onclick=()=>{ treeFresh=true; layoutTree(); };
         +'<p class="mut">Nothing is made or bought for this share of the '+esc(a.item)+'.</p>'; }
     const cons=nodeOf(h.branch), ks=kidsOf(h.branch); if(!cons) return "";
     let rows=""; if(ks) for(const b of ks.children){ const nd=nodeOf(b); if(nd) rows+=li(nd.dataset.n,(nd.querySelector(".amt")||{}).textContent||"",(nd.querySelector(".src")||{}).textContent||"",nd); }
-    for(const a of byArrows) if(String(a.to)===cons.dataset.id) rows+=li(a.item,fmt(a.amt)+"/min","Byproduct of the "+R[a.from].machine+" making "+a.from+(a.self?" (this same machine)":"")+". Press the name to go to where it comes out.",byEnds(a).pe);
+    for(const a of byArrows) if(String(a.to)===cons.dataset.id) rows+=li(a.item,fmt(a.amt)+"/min","Byproduct of the "+R[a.from].machine+" making "+a.from+(a.self?" (this same machine)":""),byEnds(a).pe);
     return '<h4>What goes straight into '+go(cons.dataset.n,cons)+' <span class="amt">'+esc((cons.querySelector(".amt")||{}).textContent||"")+'</span></h4><ul>'+rows+'</ul>'; };
   const hide=()=>{ tip.hidden=true; };
   const show=(h,e)=>{ const html=card(h); if(!html){ hide(); return; } tip.innerHTML='<button class="x" id="tipx" aria-label="Close">&times;</button>'+html; tip.hidden=false;
@@ -464,12 +464,12 @@ function renderMod(){
   $("fit").innerHTML=`<div class="fitbox">
     <div class="fithead"><span class="fitpill ${fc}">${ft}</span> <b>${fmt(rate)}/min takes about ${Math.round(flo)}–${Math.round(fhi)}% of a ${dimTxt()} tile${connBad?`, but needs ${connNow} bus connections and a tile only has ${connMax}`:` and ${connNow} of its ${connMax} bus connections`}.</b>${rate>0&&evNow.odd?` <span class="fitsub">At this size ${plural(evNow.odd,"machine count")} ${evNow.odd>1?"don't":"doesn't"} come out even, so those machines sit partly idle (see Busy).</span>`:(rate>0&&evNow.half?` <span class="fitsub">Every machine count is whole except ${evNow.half>1?evNow.half+" that run":"one that runs"} at half.</span>`:"")}</div>
     <div class="maxline">
-      <div><span class="lab">Clean block</span> <b>${fmt(block)}/min</b> <span class="fitsub">the smallest size where every machine count comes out whole</span></div>
+      <div><span class="lab">Clean block</span> <b>${fmt(block)}/min</b> <span class="fitsub">smallest size with every machine count whole</span></div>
       <div><span class="lab">Most that fits, clean blocks</span> ${bC?`<b>${fmt(bC)}/min</b> comfortably`:`<b>none</b> comfortably`}${bT>bC?` · <b>${fmt(bT)}/min</b> as a tight squeeze`:""}</div>
       <div><span class="lab">Most that fits, any size</span> ${mC?`<b>${fmt(mC)}/min</b> comfortably`:`<b>none</b> comfortably`}${mT>mC?` · <b>${fmt(mT)}/min</b> as a tight squeeze`:""} <span class="fitsub">in steps of one ${esc(fin.machine)}, ${fmt(step)}/min each</span></div>
     </div>
     <div class="tablebox inner"><table class="fitt"><thead><tr><th>Sizes worth building in this tile</th><th class="num">Output</th><th class="num">Fill</th><th>Verdict</th><th class="num">Bus connections</th><th>Machine counts</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="fitsub">Fill is the machines' own size (plus a stone furnace under each group of heated machines) times 2.4–2.8 to allow for belts, lifts and stands. That spread was measured on your coke and fertilizer modules. Knowledge altars, splitters and chests aren't counted.</p></div>`;
+    <p class="fitsub">Fill is the machines' own size, plus a stone furnace under each group of heated machines, times 2.4–2.8 for belts, lifts and stands. Knowledge altars, splitters and chests aren't counted.</p></div>`;
 
   // --- what comes in and out ---
   const fuel=C.fuelPerMin(sol,fe());
@@ -478,12 +478,12 @@ function renderMod(){
   if(fuel>1e-9&&!selfFuel&&!fuelRaw) bus+=rowKV(esc(FUELN),fmt(fuel)+"/min","fuel for the heated machines");
   if(sol.fert>1e-9&&!selfFert) bus+=rowKV(esc(FERTN),fmt(sol.fert)+"/min","for the nurseries");
   const busTotal=busItems.reduce((a,[,v])=>a+v,0)+((selfFuel||fuelRaw)?0:fuel)+(selfFert?0:sol.fert);
-  $("busin").innerHTML=(bus||`<div class="empty">Nothing. This module runs on coins alone.</div>`)+(bus?`<div class="row tot"><span>Total off the bus</span><span>${fmt(busTotal)}/min</span></div>`:"");
+  $("busin").innerHTML=(bus||`<div class="empty">Nothing. Runs on coins alone.</div>`)+(bus?`<div class="row tot"><span>Total off the bus</span><span>${fmt(busTotal)}/min</span></div>`:"");
   let coins=""; for(const [k,v] of Object.entries(sol.coins).sort((a,b)=>b[1]*I[b[0]].buy-a[1]*I[a[0]].buy)) coins+=rowKV(esc(k),fmt(v)+"/min",fmt(v*I[k].buy)+" copper/min");
   const fuelCopper=(fuelRaw&&fuel>1e-9)?fuel*I[FUELN].buy:0;
   if(fuelCopper>0) coins+=rowKV(esc(FUELN)+" (fuel)",fmt(fuel)+"/min",fmt(fuelCopper)+" copper/min");
   $("coins").innerHTML=(coins||`<div class="empty">No coins needed.</div>`)+(coins?`<div class="row tot"><span>Total coins</span><span>${fmt(sol.copper+fuelCopper)} copper/min</span></div>`:"");
-  $("fuelnote").textContent="Fuel is "+FUELN+" at "+I[FUELN].heat.toLocaleString()+" heat each, plus 10% per Fuel Efficiency level. Nurseries are fed "+FERTN+".";
+  $("fuelnote").textContent="Fuel: "+FUELN+", "+I[FUELN].heat.toLocaleString()+" heat each. Fertilizer: "+FERTN+".";
   let outp=rowKV(esc(root)+" made",fmt(rate)+"/min");
   if(selfFuel&&fuel>1e-9){ outp+=rowKV("Burned as its own fuel","−"+fmt(fuel)+"/min"); outp+=`<div class="row tot"><span>Leaves the module</span><span>${fmt(rate-fuel)}/min</span></div>`; }
   else if(selfFert&&sol.fert>1e-9){ outp+=rowKV("Fed to its own nurseries","−"+fmt(sol.fert)+"/min"); outp+=`<div class="row tot"><span>Leaves the module</span><span>${fmt(rate-sol.fert)}/min</span></div>`; }
@@ -542,11 +542,11 @@ function renderMod(){
   const notes=[];
   for(const m of sol.list){ for(const o of m.out.split(" + ").slice(1)){
     if(sol.recycled[o]>1e-9){ const mk=sol.list.find(x=>x.item===o&&x.count>1e-9);
-      if(mk) notes.push('<li><b>'+esc(o)+' comes back out of the '+esc(m.machine)+'</b> ('+fmt(sol.recycled[o])+'/min is reused here). Merge it in with a <b>priority merger, recycled '+esc(o)+' first</b>, ahead of the '+esc(o)+' from the '+esc(mk.machine)+'. Otherwise fresh supply fills the line, the '+esc(m.machine)+' can\'t get rid of its '+esc(o)+', and it stops.</li>');
-      else notes.push('<li><b>'+esc(o)+' comes out of the '+esc(m.machine)+'</b> ('+fmt(sol.recycled[o])+'/min is used here). Nothing else in this module makes '+esc(o)+', so there is nothing to merge it with: send it straight to the machines that need it.</li>'); }
-    if(sol.spare[o]>1e-9) notes.push(`<li><b>${fmt(sol.spare[o])}/min of spare ${esc(o)} comes out of the ${esc(m.machine)}.</b> It needs somewhere to go, like knowledge altars on the overflow side of a priority splitter, or the ${esc(m.machine)} backs up and stops.</li>`);
+      if(mk) notes.push('<li><b>'+esc(o)+' comes back out of the '+esc(m.machine)+'</b> ('+fmt(sol.recycled[o])+'/min). Merge it in with a <b>priority merger, recycled '+esc(o)+' first</b>, or the '+esc(m.machine)+' backs up and stops.</li>');
+      else notes.push('<li><b>'+esc(o)+' comes out of the '+esc(m.machine)+'</b> ('+fmt(sol.recycled[o])+'/min, all used here). Send it straight to the machines that need it.</li>'); }
+    if(sol.spare[o]>1e-9) notes.push(`<li><b>${fmt(sol.spare[o])}/min of spare ${esc(o)} comes out of the ${esc(m.machine)}.</b> Send it somewhere, such as knowledge altars on a priority splitter's overflow, or the ${esc(m.machine)} backs up and stops.</li>`);
   }}
-  $("notes").innerHTML=notes.length?`<div class="box"><h3>Byproducts: the only things that can stall this module</h3><ul class="notes">${notes.join("")}</ul><p class="fitsub">Everything else is safe to over-build. A machine with nowhere to send its output just waits.</p></div>`:"";
+  $("notes").innerHTML=notes.length?`<div class="box"><h3>Byproducts: the only things that can stall this module</h3><ul class="notes">${notes.join("")}</ul><p class="fitsub">Everything else is safe to over-build.</p></div>`:"";
 }
 // stepping down from exactly 1 lands on 0.99, not 0 (typing a 0 yourself is left alone)
 $("rate").oninput=e=>{ if(lastRate===1&&+$("rate").value===0&&$("rate").value!==""&&!(e&&e.inputType)) $("rate").value=0.99; renderMod(); };
@@ -561,7 +561,7 @@ function renderRates(){
     const ins=Object.entries(r.ins).map(([k,v])=>fmt(v*crafts)+" "+k).join(" + ")||(I[n].kind==="crop"?fmt(crafts*r.nut/C.fertValue())+" "+C.fert():"—");
     const outs=Object.entries(r.outs).map(([k,v])=>fmt(v*y*crafts)+" "+k).join(" + ");
     const txt=(main+" "+r.machine+" "+ins).toLowerCase(); if(q&&!txt.includes(q)) continue;
-    rows.push(`<tr><td class="name">${esc(main)}</td><td>${esc(r.machine)}</td><td>${esc(ins)}</td><td>${esc(outs)}</td><td class="num">${r.heat?fmt(r.heat):""}</td><td class="why">${x.capped?"Capped at one belt ("+fmt(C.belt())+"/min). The recipe alone would be faster.":""}</td><td class="num">${I[n].tier}</td></tr>`); }
+    rows.push(`<tr><td class="name">${esc(main)}</td><td>${esc(r.machine)}</td><td>${esc(ins)}</td><td>${esc(outs)}</td><td class="num">${r.heat?fmt(r.heat):""}</td><td class="why">${x.capped?"Capped at one belt ("+fmt(C.belt())+"/min).":""}</td><td class="num">${I[n].tier}</td></tr>`); }
   $("rrows").innerHTML=rows.join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
 }
 $("rq").oninput=renderRates;

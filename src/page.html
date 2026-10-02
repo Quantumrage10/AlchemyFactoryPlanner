@@ -1,7 +1,7 @@
 <div class="wrap">
   <header>
     <h1>Bus Split Planner</h1>
-    <p class="sub">What goes on the bus, what each module needs, and whether it fits. Every number comes from the recipe data (<span id="ver"></span>) at your upgrade levels, with every machine capped at one belt of output.</p>
+    <p class="sub">What goes on the bus, what each module needs, and whether it fits. Recipe data: <span id="ver"></span>.</p>
   </header>
 
 
@@ -20,7 +20,7 @@
     <div class="cards">
       <section class="card" aria-labelledby="h-up">
         <h2 id="h-up">Your upgrades</h2>
-        <p class="mut">Copy the levels from your upgrade screen. Leave at 0 anything you haven't bought.</p>
+        <p class="mut">The levels on your upgrade screen.</p>
         <div class="fields">
         <label class="field" for="lvlbelt"><span>Logistics</span><input type="number" autocomplete="off" id="lvlbelt" min="0" step="1" value="0"><small>belt speed</small></label>
         <label class="field" for="lvlspeed"><span>Factory Efficiency</span><input type="number" autocomplete="off" id="lvlspeed" min="0" step="1" value="0"><small>machine speed</small></label>
@@ -33,16 +33,15 @@
       </section>
       <section class="card" aria-labelledby="h-base">
         <h2 id="h-base">What your base runs on</h2>
-        <p class="mut">The fuel your furnaces burn, the fertilizer your nurseries are fed, and how far through the tech tree you are.</p>
         <div class="fields wide">
-          <label class="field" for="fuelsel"><span>Fuel</span><select id="fuelsel" autocomplete="off"></select><small>used to work out how much fuel each module burns</small></label>
-          <label class="field" for="fertsel"><span>Fertilizer</span><select id="fertsel" autocomplete="off"></select><small>used to work out how fast nurseries grow</small></label>
-          <label class="field" for="tier"><span>Show items up to tier</span><select id="tier" autocomplete="off"></select><small>hides everything you haven't unlocked</small></label>
+          <label class="field" for="fuelsel"><span>Fuel</span><select id="fuelsel" autocomplete="off"></select><small>what heated machines burn</small></label>
+          <label class="field" for="fertsel"><span>Fertilizer</span><select id="fertsel" autocomplete="off"></select><small>what nurseries are fed</small></label>
+          <label class="field" for="tier"><span>Show items up to tier</span><select id="tier" autocomplete="off"></select><small>hides items above this tier</small></label>
         </div>
       </section>
       <section class="card" aria-labelledby="h-tile">
         <h2 id="h-tile">Your tiles</h2>
-        <p class="mut">The space one module gets, and how many bus stations it can have. An item only goes on the bus when a module can't fit making it in this space.</p>
+        <p class="mut">The space one module gets. An item goes on the bus only when a module can't fit making it in this space.</p>
         <div class="fields">
           <label class="field" for="mL"><span>Length</span><input type="number" autocomplete="off" id="mL" min="1" step="1" value="14"><small>blocks</small></label>
           <label class="field" for="mW"><span>Width</span><input type="number" autocomplete="off" id="mW" min="1" step="1" value="14"><small>blocks</small></label>
@@ -51,20 +50,20 @@
         </div>
       </section>
     </div>
-    <p class="foot">Everything on the other pages follows what you set here. It's remembered in this browser only.</p>
+    <p class="foot">Saved in this browser only.</p>
   </section>
 
   <section id="pane-items" role="tabpanel" aria-labelledby="tab-items" class="pane">
   <details class="how">
-    <summary>How the bus line is drawn, and what the four labels mean</summary>
-    <div>A module makes everything it needs inside its own tile, from coins, whenever that fits. What you see below is only our recommended starting layout. Every item has a picker, so you can put anything anywhere:</div>
+    <summary>How the bus line is drawn</summary>
+    <div>A module makes everything it needs inside its own tile, from coins, when that fits. The layout below is a recommendation; change any item with its picker.</div>
     <ul class="legendlist">
-      <li><span class="st ded">Yes · own wagons</span> It gets its own module and its own tagged wagons. Recommended when a module that needs it can't fit making it.</li>
-      <li><span class="st mix">Yes · shared wagon</span> It rides a wagon type with other items. This works when the place it's going takes any of them: a furnace takes any fuel, a nursery any fertilizer, research any relic. You can still unload one particular item off a shared wagon by filtering on the cargo.</li>
-      <li><span class="st maybe">Maybe</span> Packed-down items that only one or two things use. They fit inside the module that uses them, or you can bus them. Your call.</li>
-      <li><span class="st no">No</span> Made right where it's used, or next to the shop.</li>
+      <li><span class="st ded">Yes · own wagons</span> Its own module and its own tagged wagons.</li>
+      <li><span class="st mix">Yes · shared wagon</span> Rides one wagon type with other items. Works where the destination takes any of them: furnaces, nurseries, research. You can still unload one item by filtering on cargo.</li>
+      <li><span class="st maybe">Maybe</span> Fits inside the module that uses it, or can be bussed. Your call.</li>
+      <li><span class="st no">No</span> Made where it's used, or next to the shop.</li>
     </ul>
-    <div class="mut"><b>Shared wagons push.</b> If you make too much of one item, it can fill the shared wagons before another item gets picked up. If that bites, give the item its own wagons.</div>
+    <div class="mut"><b>Shared wagons push.</b> Too much of one item can fill the wagons before another gets picked up. If that happens, give the item its own wagons.</div>
   </details>
   <section class="board" aria-label="Your bus">
     <div class="boardhead">
@@ -72,7 +71,7 @@
       <span class="mut" id="planstate"></span>
       <div class="boardbtns"><button class="resetbtn" id="resetrec">Reset to recommended</button> <button class="resetbtn plain" id="clearall">Clear all</button></div>
     </div>
-    <div class="mut"><b>Shared wagons.</b> Items in the same box ride one wagon type between them. Rename or delete a wagon, make your own, and add items here or with the picker in the table below.</div>
+    <div class="mut"><b>Shared wagons.</b> Items in one box ride the same wagon type.</div>
     <div class="tags" id="tags"></div>
     <div class="addtagrow"><input type="text" id="newtag" autocomplete="off" placeholder="Name a new shared wagon…" aria-label="Name a new shared wagon"> <button class="resetbtn plain" id="addtag">Add shared wagon</button></div>
   </section>
@@ -102,7 +101,7 @@
       </tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
-    <p class="foot">Click an item's name to open its module. Every item that's made in a machine has one, whether it's on the bus or not.</p>
+    <p class="foot">Click an item's name to open its module.</p>
   </section>
 
   <section id="pane-mods" role="tabpanel" aria-labelledby="tab-mods" class="pane" hidden>
@@ -127,11 +126,11 @@
         </div>
         <div class="box">
           <div class="dhead"><h3>Every ingredient, and where it comes from</h3><button class="resetbtn plain" id="treereset">Reset view</button></div>
-          <p class="fitsub">Read it left to right. Every item sits to the right of what goes into it, and the lines show what feeds what, ending at the finished item. Something used in several places shows up in each one, with the amount that place needs. A dashed arrow is a byproduct: it runs from the machine it comes out of to the item that uses it. <b>Hold Ctrl and scroll to zoom in or out on wherever your mouse is, and drag to move it around. Once you are working in the tree, the scroll wheel moves it up and down. "Reset view" puts it back. Point at any line to light up what it joins, and click it to see just those things. The eye on a box shows only what goes into that box.</b></p>
+          <p class="fitsub">Read left to right: each item sits to the right of what goes into it. A dashed arrow is a byproduct. <b>Ctrl + scroll zooms. Drag or scroll to move. Point at a line to light up what it joins; click it for details. The eye on a box shows only what goes into it.</b></p>
           <div class="focusbar" id="treefocus" hidden>Showing only what goes into <b id="treefocusname"></b>. <button class="resetbtn plain" id="treefocusoff">Show the whole tree</button></div>
           <div class="flow" id="ingr"></div>
           <div class="treetip" id="treetip" hidden></div>
-          <p class="fitsub">Put any ingredient on the bus, or keep it off, to see what it does to the size, the machines and what the bus has to carry. The choice applies to every module that uses that ingredient. Anything under an off-the-bus ingredient disappears from this module, because another module makes it.</p>
+          <p class="fitsub">Putting an ingredient on the bus, or taking it off, applies to every module that uses it.</p>
         </div>
         <div class="tablebox"><table>
           <thead><tr><th>Machine <small class="mut">in build order</small></th><th>Makes</th><th class="num">One machine makes</th><th class="num">Exact</th><th class="num">Build</th><th class="num">Busy</th></tr></thead>
@@ -139,7 +138,7 @@
         </table></div>
         <div class="mut" id="mtot"></div>
         <div id="notes"></div>
-        <p class="foot"><span id="fuelnote"></span> Faster machines burn fuel faster, so fuel per item stays the same. Fertilizer goes further with Fertilizer Efficiency, and Alchemy Skill raises what extractors and alembics give. A byproduct the module reuses (like the Athanor's charcoal) is taken off the machine counts first.</p>
+        <p class="foot"><span id="fuelnote"></span></p>
       </div>
     </div>
   </section>
@@ -150,6 +149,6 @@
       <thead><tr><th>Makes</th><th>Machine</th><th>One machine takes, per minute</th><th>One machine makes, per minute</th><th class="num">Heat /s</th><th>Note</th><th class="num">Tier</th></tr></thead>
       <tbody id="rrows"></tbody>
     </table></div>
-    <p class="foot">These are the numbers everything else on this page is built from. They follow the upgrade levels set at the top. If one doesn't match what the machine shows in your game, that's the one that's wrong.</p>
+    <p class="foot">Rates at your upgrade levels. If one doesn't match your game, the recipe data is wrong.</p>
   </section>
 </div>
