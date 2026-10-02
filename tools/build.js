@@ -27,7 +27,7 @@ const init = { fe: '0', mL: '14', mW: '14', mH: '15', connmax: '8', lvlbelt: '0'
 for (const k in init) doc.getElementById(k).value = init[k];
 const store = {};
 const ls = { getItem: k => store[k] || null, setItem: (k, v) => { store[k] = v; } };
-const api = new Function('document', 'localStorage', 'window', script + '\n;return {openMod,decide,status,setPlace,addTag,deleteTag,resetPlan,clearPlan,valueOf};')(doc, ls, { scrollTo() {} });
+const api = new Function('document', 'localStorage', 'window', script + '\n;return {get byArrows(){ return byArrows; },treeProblems,modNames,openMod,decide,status,setPlace,addTag,deleteTag,resetPlan,clearPlan,valueOf};')(doc, ls, { scrollTo() {} });
 const strip = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const must = (cond, msg) => { if (!cond) { console.error('Smoke test failed: ' + msg); process.exit(1); } };
 // a stylesheet that closes its own <style> tag, or contains script, spills onto the page as text
@@ -100,6 +100,22 @@ api.openMod('Coke Powder'); els.rate.value = '30'; els.rate.oninput();
 { const t = strip(els.ingr.innerHTML); must(t.includes('Charcoal 300/min') && t.includes('Plank 300/min'), 'coke should get 60 charcoal back and make only 300: ' + t); }
 api.openMod('Steel Ingot'); els.rate.value = '60'; els.rate.oninput();
 { const t = strip(els.ingr.innerHTML); must(t.includes('Iron Ingot 60/min'), 'steel should get 180 iron ingots back and smelt only 60: ' + t); }
+// with everything made inside, a steel Athanor only ever hands back what it gave off: three iron ingots for each steel ingot
+api.clearPlan(); api.openMod('Sol'); els.rate.value = '0.01'; els.rate.oninput();
+{ const steel = api.byArrows.filter(a => a.item === 'Iron Ingot' && a.from === 'Steel Ingot'), other = api.byArrows.filter(a => a.item === 'Iron Ingot' && a.from !== 'Steel Ingot');
+  must(steel.length > 0 && steel.every(a => a.self), 'steel iron ingots should only loop back into the Athanor they came out of: ' + JSON.stringify(steel.filter(a => !a.self).slice(0, 3)));
+  must(other.every(a => a.from === 'Sulfur'), 'spare iron ingots elsewhere should be credited to the smelter making sulfur: ' + JSON.stringify(other.slice(0, 3))); }
+// and no box hands out more of a byproduct than it gives off: a salt Athanor makes 12 sand for every salt
+{ const out = {}; for (const a of api.byArrows) if (a.item === 'Sand' && a.from === 'Salt') out[a.fromId] = (out[a.fromId] || 0) + a.amt;
+  const t = els.ingr.innerHTML; for (const id in out) { const m = t.match(new RegExp('data-id="' + id + '" data-n="Salt"><div><b>Salt</b> <span class="amt">([0-9.,]+)/min')); must(m, 'sand arrow from a box that is not a salt box: ' + id); const salt = +m[1].replace(/,/g, ''); must(out[id] <= salt * 12 * 1.02 + 0.5, 'a salt box making ' + salt + '/min hands out ' + out[id].toFixed(0) + ' sand, more than 12 each'); } }
+api.resetPlan();
+// the ingredient tree's rules hold for every module in the game, three ways: the recommended plan, everything made
+// inside, and everything made inside at a different size
+{ const check = label => { for (const m of api.modNames()) { api.openMod(m); const bad = api.treeProblems(); must(!bad.length, 'ingredient tree, ' + label + ', ' + m + ': ' + bad.slice(0, 3).join(' | ')); } };
+  check('recommended plan');
+  api.clearPlan(); check('everything made inside');
+  for (const m of api.modNames()) { api.openMod(m); els.rate.value = String(+els.rate.value * 7.3 || 3); els.rate.oninput(); const bad = api.treeProblems(); must(!bad.length, 'ingredient tree, everything made inside at another size, ' + m + ': ' + bad.slice(0, 3).join(' | ')); }
+  api.resetPlan(); }
 // when a bus connection runs out between two whole-machine sizes, the size table still offers the most that fits
 api.openMod('Gold Dust');
 must(/Most that fits/.test(strip(els.fit.innerHTML)) && !/Even the smallest size is too big/.test(strip(els.fit.innerHTML)), 'gold dust should be offered the most that fits its bus connections: ' + strip(els.fit.innerHTML).slice(0, 300));

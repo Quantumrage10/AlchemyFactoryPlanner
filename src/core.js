@@ -34,15 +34,21 @@ function makeCore(DATA){
     return {per,capped}; }
   // cuts: Set of item names taken off the bus instead of made in this module
   function solve(root,outRate,cuts){
-    let byp={}, res=null;
-    for(let it=0;it<80;it++){
+    let byp={}, was={}, res=null;
+    // Byproducts are settled by repetition: work the chain out, see what comes back, take that off, repeat. Two recipes
+    // that give off each other's product (a World Tree Nursery makes leaves and cores together; copper powder and impure
+    // copper powder) never settle that way, they swing back and forth, so after a few rounds each round moves only half way.
+    for(let it=0;it<400;it++){
       const mach={}, busIn={}, coins={}, flows={}, nb={}; let fert=0;
       const expand=(n,q,d)=>{ if(d>60) return;
         if(n!==root && cuts.has(n)){ busIn[n]=(busIn[n]||0)+q; return; }
         const r=R[n]; if(!r){ busIn[n]=(busIn[n]||0)+q; return; }
         flows[n]=(flows[n]||0)+q;
         if(kind(n)==='raw'){ coins[n]=(coins[n]||0)+q; return; }
-        const share=(byp[n]||0)*(q/(flows[n]||q)); const net=Math.max(0,q-share);
+        // An item needed in several places gets the returned byproduct shared out by how much each place needs. The
+        // split uses the totals from the round before: using the running total here gave the first place the whole lot
+        // and the later places a share on top, taking more off than was ever returned.
+        const share=Math.min(q,(byp[n]||0)*(q/(was[n]||q))); const net=Math.max(0,q-share);
         const y=yieldOf(r); const machines=net/rate(r,n).per, crafts=net/(r.outs[n]*y);
         mach[n]=(mach[n]||0)+machines;
         if(r.nut) fert+=crafts*r.nut/fertValue();
@@ -54,7 +60,9 @@ function makeCore(DATA){
       const spare={}; for(const o in nb){ const used=Math.min(nb[o],flows[o]||0); if(nb[o]-used>1e-9) spare[o]=nb[o]-used; }
       res={mach,busIn,coins,fert,spare,flows,recycled:nbyp};
       let diff=0; const keys=new Set([...Object.keys(nbyp),...Object.keys(byp)]); for(const k of keys) diff+=Math.abs((nbyp[k]||0)-(byp[k]||0));
-      byp=nbyp; if(diff<1e-9) break;
+      for(const k of new Set([...Object.keys(flows),...Object.keys(was)])) diff+=Math.abs((flows[k]||0)-(was[k]||0)); was=flows;
+      if(diff<1e-9) break;
+      if(it<12) byp=nbyp; else { const half={}; for(const k of keys){ const v=(byp[k]||0)+((nbyp[k]||0)-(byp[k]||0))*0.5; if(v>1e-12) half[k]=v; } byp=half; }
     }
     let hps=0; const list=[];
     for(const n in res.mach){ const r=R[n], c=res.mach[n]; hps+=c*(r.heat||0)*SPEED;

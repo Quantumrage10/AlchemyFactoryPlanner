@@ -473,6 +473,71 @@ function layoutTree(){ const zw=$("ingr").firstElementChild, top=zw&&zw.firstEle
   fix(top); drawBy(); placeTree(treeFresh); treeFresh=false; }
 if(window.addEventListener) window.addEventListener("resize",layoutTree);
 if(document.fonts&&document.fonts.ready) document.fonts.ready.then(layoutTree);
+// ---------- the ingredient tree, as data ----------
+// One general set of rules, the same for every module. Nothing here knows about any particular item.
+//
+// The tree: the finished item at the root; under each item, one node for each ingredient its recipe takes, with the
+//   amount that place needs. An ingredient stops there (a leaf) when it comes off the bus or is bought with coins.
+// Byproducts: a machine that makes an item also gives off its recipe's other outputs, in proportion to what it makes.
+//   Every node that needs an item (and is not taking it off the bus) can be fed by any machine in the module that
+//   gives that item off. That includes the finished item itself: if a machine further up gives off some of it, the
+//   final machine has that much less to make.
+// Who gets what: for each item, every possible pairing of a machine giving it off with a place needing it is ranked by
+//   how far apart the two are along the tree, and filled nearest first. A machine feeding itself is distance 0, the
+//   step just before it on its own line is next, another line is furthest. Ties go to the earlier box.
+// What is left: a place makes (or buys) only what byproducts do not cover; that smaller amount is what its own
+//   ingredients are worked out from. Because that changes how much everything further up gives off, the whole thing
+//   is repeated until the amounts stop moving.
+// No machine hands out more of a byproduct than it gives off, and no place takes more than it needs.
+function buildTree(root,rate,cs,pos){ const eps=1e-9; let taken={}, T=null;
+  const build=()=>{ const nodes=[]; let nid=0;
+    const expand=(n,q,parent,depth)=>{ const r=R[n], nd={key:(parent?parent.key:"")+">"+n,n,q,parent,depth,kids:[],out:{},by:[],id:++nid}; nodes.push(nd);
+      nd.made=Math.max(0,q-Math.min(q,taken[nd.key]||0)); nd.full=!!parent&&q>eps&&nd.made<=Math.max(eps,q*1e-7);
+      const open=(!parent||!cs.has(n))&&r&&I[n].kind!=="raw";
+      if(open&&depth<40&&!nd.full&&nd.made>eps){ const yl=C.yieldOf(r), crafts=nd.made/(r.outs[n]*yl); nd.ran=true;
+        for(const o in r.outs) if(o!==n) nd.out[o]=crafts*r.outs[o]*yl;
+        for(const i of Object.keys(r.ins).filter(i=>I[i]).sort((x,y)=>((pos&&pos[x])||0)-((pos&&pos[y])||0))) nd.kids.push(expand(i,crafts*r.ins[i],nd,depth+1)); }
+      return nd; };
+    return {root:expand(root,rate,null,0),nodes}; };
+  const dist=(x,y)=>{ let d=0; while(x!==y){ if(x.depth>=y.depth) x=x.parent; else y=y.parent; d++; if(!x||!y) return 1e9; } return d; };
+  const allocate=tr=>{ const next={}, gives={}, needs={};
+    for(const nd of tr.nodes){ nd.by=[]; for(const o in nd.out) if(nd.out[o]>eps) (gives[o]=gives[o]||[]).push({nd,left:nd.out[o]});
+      if((!nd.parent||!cs.has(nd.n))&&nd.q>eps) (needs[nd.n]=needs[nd.n]||[]).push({nd,need:nd.q}); }
+    for(const n in gives){ if(!needs[n]) continue; const pairs=[];
+      for(const g of gives[n]) for(const c of needs[n]) pairs.push({g,c,d:dist(g.nd,c.nd.parent||c.nd)});
+      pairs.sort((x,y)=>x.d-y.d||x.c.nd.id-y.c.nd.id||x.g.nd.id-y.g.nd.id);
+      for(const p of pairs){ const t=Math.min(p.g.left,p.c.need); if(t>eps){ p.g.left-=t; p.c.need-=t; p.c.nd.by.push({from:p.g.nd,amt:t}); } }
+      for(const c of needs[n]){ const tot=c.nd.by.reduce((s,x)=>s+x.amt,0); if(tot>eps) next[c.nd.key]=tot; } }
+    return next; };
+  // Repeat until settled. Each round moves only half way to the new answer: two machines that each give off what the
+  // other is made of (copper powder and impure copper powder) would otherwise swing back and forth for ever.
+  for(let pass=0;pass<200;pass++){ T=build(); const next=allocate(T); let diff=0, size=0;
+    for(const k of new Set(Object.keys(next).concat(Object.keys(taken)))){ const o=taken[k]||0, v=o+(( next[k]||0)-o)*0.5; diff+=Math.abs((next[k]||0)-o); size+=Math.abs(v); if(v>eps) taken[k]=v; else delete taken[k]; }
+    if(diff<=1e-7*(1+size)) break; }
+  // draw exactly what was settled on: the boxes come from the settled amounts, so the arrows are made to add up to them
+  T=build(); allocate(T);
+  for(const nd of T.nodes){ const want=nd.q-nd.made, have=nd.by.reduce((t,x)=>t+x.amt,0); if(have>eps){ const f=want/have; for(const x of nd.by) x.amt*=f; } nd.by=nd.by.filter(x=>x.amt>eps); }
+  const arrows=[]; for(const nd of T.nodes) for(const x of nd.by) if(x.amt>1e-6) arrows.push({from:x.from.n,fromId:x.from.id,item:nd.n,amt:x.amt,to:(nd.parent||nd).id,self:x.from===nd.parent});
+  return {root:T.root,nodes:T.nodes,arrows}; }
+// The rules above, checked on the tree that is on screen. Returns a list of what is wrong; an empty list is a pass.
+// The build runs this for every module in the game.
+let lastTree=null, lastSol=null;
+function treeProblems(){ const T=lastTree, sol=lastSol, out=[]; if(!T) return out; const tol=(x)=>Math.abs(x)*0.005+0.01, given={}, got={};
+  for(const nd of T.nodes){ const tk=nd.by.reduce((s,x)=>s+x.amt,0);
+    if(tk>nd.q+tol(nd.q)) out.push(nd.n+" takes "+tk+" of byproduct but only needs "+nd.q);
+    if(Math.abs(nd.q-tk-nd.made)>tol(nd.q)) out.push(nd.n+" makes "+nd.made+" but needs "+nd.q+" less "+tk+" of byproduct");
+    for(const x of nd.by){ const k=x.from.id+"|"+nd.n; given[k]=(given[k]||0)+x.amt; got[nd.n]=(got[nd.n]||0)+x.amt;
+      if(!x.from.out[nd.n]) out.push(x.from.n+" is drawn giving off "+nd.n+", which its recipe does not make");
+ } }
+  for(const nd of T.nodes) for(const o in nd.out){ const g=given[nd.id+"|"+o]||0; if(g>nd.out[o]+tol(nd.out[o])) out.push(nd.n+" hands out "+g+" "+o+" but only gives off "+nd.out[o]); }
+  // The chart and the machine list are two separate calculations. They must agree on how much every recipe runs. (It is
+  // compared recipe by recipe, not item by item, because a recipe that makes two wanted things at once, like a World Tree
+  // Nursery's leaves and cores, can be counted under either item and still be the same machines.)
+  const runs={}, want={}; const add=(o,n,items)=>{ const r=R[n]; if(!r||I[n].kind==="raw") return; o[r.id]=(o[r.id]||0)+items/(r.outs[n]*C.yieldOf(r)); };
+  for(const nd of T.nodes) if(nd.ran) add(runs,nd.n,nd.made);
+  for(const m of sol.list) add(want,m.item,m.count*m.each);
+  for(const id of new Set(Object.keys(runs).concat(Object.keys(want)))){ const x=runs[id]||0, y=want[id]||0; if(Math.abs(x-y)>tol(y)*4) out.push("the chart runs the "+id+" recipe "+x+" times a minute but the machine list runs it "+y); }
+  return out; }
 function renderMod(){
   if(!cur) return; const root=cur, rate=Math.max(0,+$("rate").value||0), cs=cuts(root), L=line();
   const sol=C.solve(root,rate,cs);
@@ -544,31 +609,15 @@ function renderMod(){
     return '<div class="node '+cls+(eye?' haseye':'')+'" data-id="'+id+'" data-n="'+esc(n)+'"><div><b>'+esc(n)+'</b> <span class="amt">'+fmt(amt)+'/min</span></div><div>'+src+mark+'</div>'+act+(eye?'<button class="eye" data-eye="'+id+'" data-n="'+esc(n)+'" title="Show only what goes into '+esc(n)+'" aria-label="Show only what goes into '+esc(n)+'">'+EYE+'</button>':"")+'</div>'; };
   // a tree, read left to right: every item sits to the right of what goes into it, joined by lines, and the
   // finished item is at the far right. Something used in several places shows up in each, with the amount that place needs.
-  byArrows=[]; let nid=0, dry=true; const own={}, rest={};
-  // Who gets a byproduct. A machine's byproduct belongs first to its own production line: it goes back to the nearest
-  // earlier step of the line it is on that needs it (the coke Athanor's charcoal goes back to the charcoal powder feeding
-  // that same Athanor; the steel Athanor's iron ingots go back into that same Athanor). It is never sent across to a
-  // different line while its own line still needs it. Only what a line cannot use itself is shared out to other lines.
-  // The tree is walked twice: once to find how much each line keeps for itself, then for real with only the leftover to share.
-  const restOf=n=>rest[n]||(rest[n]={v:Math.max(0,sol.recycled[n]-(own[n]||0))});
-  const tree=(n,q,d,parent,pn,anc)=>{ const isRoot=d===0, r=R[n], cut=!isRoot&&cs.has(n), id=++nid;
-    let by=null; if(!isRoot&&!cut&&sol.recycled[n]>1e-9&&sol.flows[n]>1e-9){
-      let src=null; for(let i=anc.length-1;i>=0;i--) if(anc[i].pools[n]>1e-9){ src=anc[i]; break; }
-      let take=0, from=null, fromId=null;
-      if(src){ take=Math.min(q,src.pools[n]); src.pools[n]-=take; from=src.item; fromId=src.id; if(dry) own[n]=(own[n]||0)+take; }
-      else if(!dry){ from=Object.keys(sol.flows).find(p=>p!==n&&R[p]&&R[p].outs[n]!=null&&I[p].kind!=="raw"); if(from){ const pool=restOf(n); take=Math.min(q,pool.v); pool.v-=take; } }
-      // the arrow always points at the thing that uses the byproduct; the item's own box shows only what still has to be made
-      if(take>1e-6&&from){ by={amt:take,from,full:take>=q-1e-6}; if(!dry) byArrows.push({from,fromId,item:n,amt:take,to:parent,self:fromId!==null&&fromId===parent}); if(by.full){ nid--; return ""; } } }
-    const leaf=d>40||!r||I[n].kind==="raw"||cut||(by&&by.full), mq=by?q-by.amt:q;
-    let kids="", tail=false; if(!leaf){ const yl=C.yieldOf(r), crafts=mq/(r.outs[n]*yl); const ks=Object.keys(r.ins).filter(i=>I[i]).sort((x,y)=>(G.pos[x]??0)-(G.pos[y]??0));
-      // what this machine gives off besides its main item, for the earlier steps of its own line to draw on
-      const mine={item:n,id,pools:{}}; for(const o in r.outs) if(o!==n) mine.pools[o]=crafts*r.outs[o]*yl; const line=anc.concat([mine]);
-      const inner=ks.map(i=>tree(i,crafts*r.ins[i],d+1,id,n,line)).join("");
-      tail=!inner&&ks.length>0;
-      if(inner) kids='<div class="kids">'+inner+'</div><div class="stub" aria-hidden="true"></div><div class="tri" aria-hidden="true"></div>'; }
-    return '<div class="branch'+(tail?' tail':'')+'">'+kids+nodeHtml(n,mq,isRoot,id,!!kids&&!isRoot)+'</div>'; };
+  // the tree is worked out as data by buildTree(), then drawn: a box for everything still made or brought in, an arrow
+  // for every byproduct. An ingredient wholly covered by byproducts gets no box of its own.
+  const T=buildTree(root,rate,cs,G.pos); lastTree=T; lastSol=sol; byArrows=T.arrows;
+  const draw=nd=>{ const shown=nd.kids.filter(k=>!k.full), tail=!shown.length&&nd.kids.length>0;
+    const kids=shown.length?'<div class="kids">'+shown.map(draw).join("")+'</div><div class="stub" aria-hidden="true"></div><div class="tri" aria-hidden="true"></div>':"";
+    return '<div class="branch'+(tail?" tail":"")+'">'+kids+nodeHtml(nd.n,nd===T.root?nd.q:nd.made,nd===T.root,nd.id,shown.length>0&&nd!==T.root)+'</div>'; };
   if(root!==treeRoot){ treeRoot=root; treeFresh=true; treeFocus=null; $("treetip").hidden=true; }
-  $("ingr").innerHTML='<div class="zw" style="transform:'+treeTf()+'">'+(tree(root,rate,0,0,null,[]),dry=false,nid=0,byArrows=[],tree(root,rate,0,0,null,[]))+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg></div>'; applyFocus(); layoutTree();
+  $("ingr").innerHTML='<div class="zw" style="transform:'+treeTf()+'">'+draw(T.root)+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg></div>';
+  applyFocus(); layoutTree();
 
   // --- machines ---
   $("mrows").innerHTML=sol.list.filter(m=>m.count>1e-9).sort((a,b)=>(G.pos[a.item]??999)-(G.pos[b.item]??999)).map(m=>{ const n=m.count, b=Math.ceil(n-1e-9), busy=b?n/b*100:0;
