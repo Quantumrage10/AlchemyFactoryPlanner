@@ -328,3 +328,8 @@ html{scroll-snap-type:y proximity}
 /* a long table is simply as tall as the window */
 .tablebox{max-height:min(calc(100vh - 16px),var(--tableh,860px))}
 .tablebox.inner{max-height:none}
+/* where a table has its search row above it, scrolling catches on the search row, and the table leaves room for it */
+#pane-items>.controls,#pane-rates>.controls{scroll-snap-align:start;scroll-margin-top:8px}
+#pane-items>.tablebox,#pane-rates>.tablebox{scroll-snap-align:none}
+#pane-items>.tablebox{max-height:calc(min(100vh - 16px,var(--tableh,860px)) - 120px)}
+#pane-rates>.tablebox{max-height:calc(min(100vh - 16px,var(--tableh,860px)) - 64px)}
