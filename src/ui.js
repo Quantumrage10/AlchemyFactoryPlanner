@@ -172,7 +172,7 @@ $("ctxgo").onclick=()=>setTab("setup");
 for(const k of TABS) $("tab-"+k).onclick=()=>setTab(k);
 
 // ---------- tab 2: build a module ----------
-let cur=null;
+let cur=null, lastRate=null;
 const modNames=()=>Object.keys(I).filter(n=>I[n].kind==="made"&&!I[n].liq&&inTier(n)).sort((a,b)=>I[a].tier-I[b].tier||a.localeCompare(b));
 function renderList(){
   const q=$("mq").value.trim().toLowerCase();
@@ -233,8 +233,8 @@ function renderMod(){
   if(!cur) return; const root=cur, rate=Math.max(0,+$("rate").value||0), cs=cuts(root), L=line();
   const sol=C.solve(root,rate,cs);
   const {one,selfFuel,selfFert,FUELN,FERTN,fuelRaw,CONN,connMax,fuel1,perUnit,outUnit,stations,connAt,block,step,cp,fillAt,evenness,cand,pick,fitC,tightC,overC,round}=sizing(root,cs);
-  // the arrows on the output box move in steps that suit the module: half of one final machine, and never more than 1
-  $("rate").step=+Math.min(1,step/2).toPrecision(6);
+  // the arrows on the output box step by 1 from one upwards and by 0.01 below one
+  $("rate").step=rate<1?0.01:1; lastRate=rate;
   $("mname").textContent=root;
   const it=I[root], st=status(root); const users=it.uses.filter(inTier);
   const ends=[...users, it.relic?"research":"", it.sell?"the shop":""].filter(Boolean);
@@ -312,7 +312,8 @@ function renderMod(){
   }}
   $("notes").innerHTML=notes.length?`<div class="box"><h3>Byproducts: the only things that can stall this module</h3><ul class="notes">${notes.join("")}</ul><p class="fitsub">Everything else is safe to over-build. A machine with nowhere to send its output just waits.</p></div>`:"";
 }
-$("rate").oninput=renderMod;
+// stepping down from exactly 1 lands on 0.99, not 0 (typing a 0 yourself is left alone)
+$("rate").oninput=e=>{ if(lastRate===1&&+$("rate").value===0&&$("rate").value!==""&&!(e&&e.inputType)) $("rate").value=0.99; renderMod(); };
 $("fit").addEventListener("click",e=>{ const x=e.target.closest("[data-rate]"); if(x){ $("rate").value=+(+x.dataset.rate).toPrecision(6); renderMod(); } });
 $("ingr").addEventListener("click",e=>{ const b=e.target.closest(".swap"); if(b) decide(b.dataset.item,b.dataset.to||null); });
 

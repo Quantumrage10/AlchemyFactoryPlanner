@@ -39,7 +39,9 @@ must(doc.getElementById('lvlspeed').value == 0, 'a stray value in the Factory Ef
 api.openMod('Jupiter');
 must(/Flax 360\/min/.test(strip(els.ingr.innerHTML)), 'Jupiter ingredients did not render');
 must(/Advanced Fertilizer.*12\/min/.test(strip(els.busin.innerHTML)), 'Jupiter bus inputs are wrong');
-must(els.rate.step == 0.05, 'Jupiter output should step by half a machine, 0.05: ' + els.rate.step);
+must(els.rate.step == 0.01, 'below one, the output should step by 0.01: ' + els.rate.step);
+els.rate.value = '1'; els.rate.oninput(); els.rate.value = '0'; els.rate.oninput({});
+must(els.rate.value == 0.99, 'stepping down from 1 should land on 0.99: ' + els.rate.value);
 api.openMod('Saturn');
 // Saturn opens at the biggest size that fits, 0.4/min: two stations each for salt, brick and glass, plus one out
 must(els.rate.value == 0.4, 'Saturn did not open at its biggest fitting size: ' + els.rate.value);
@@ -68,7 +70,7 @@ doc.getElementById('lvlsell').value = '0'; doc.getElementById('lvlsell').oninput
 // a different fuel: blast potion is far hotter than coke powder, so a glass module needs far less of it
 api.openMod('Glass');
 must(/Coke Powder/.test(strip(els.busin.innerHTML)), 'glass should burn coke powder by default');
-must(els.rate.step == 1, 'glass output should step by 1: ' + els.rate.step);
+must(els.rate.step == 1, 'from one upwards, the output should step by 1: ' + els.rate.step);
 doc.getElementById('fuelsel').value = 'Blast Potion'; doc.getElementById('fuelsel').onchange();
 api.openMod('Glass');
 must(/Blast Potion/.test(strip(els.busin.innerHTML)) && !/Coke Powder/.test(strip(els.busin.innerHTML)), 'changing the fuel did not change what glass burns: ' + strip(els.busin.innerHTML));
