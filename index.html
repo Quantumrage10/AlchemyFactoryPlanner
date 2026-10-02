@@ -960,7 +960,10 @@ const treeTf=()=>"translate("+Math.round(treeX)+"px,"+Math.round(treeY)+"px) sca
 // the mouse where it is, and dragging moves the tree; part of it always stays inside the window.
 // Nothing here ever scrolls the page.
 function placeTree(reset){ const flow=$("ingr"), zw=flow.firstElementChild; if(!zw) return; const W0=zw.offsetWidth, H0=zw.offsetHeight;
-  flow.style.height=Math.max(320,Math.round((window.innerHeight||800)-40))+"px";
+  // the whole box (heading and Reset view above, the tree, the note below) is what fills the window, so the tree itself
+  // gets the window height less everything else in its box
+  const bx=flow.closest(".box"), rest=bx?bx.offsetHeight-flow.offsetHeight:0;
+  flow.style.height=Math.max(280,Math.round((window.innerHeight||800)-24-rest))+"px";
   const cw=flow.clientWidth, ch=flow.clientHeight;
   if(reset){ treeZoom=Math.min(1,cw/W0,ch/H0); treeX=(cw-W0*treeZoom)/2; treeY=(ch-H0*treeZoom)/2; }
   // the tree goes exactly where zooming and dragging put it; the only limit is that a good piece of it stays in the window
@@ -971,14 +974,14 @@ function placeTree(reset){ const flow=$("ingr"), zw=flow.firstElementChild; if(!
   zw.style.transform=treeTf(); }
 // As soon as you start working with the tree (pressing on it, or zooming it) the page slides so the whole tree window is
 // on screen. Plain scrolling past it is left alone.
-function frameTree(){ const d=$("ingr").getBoundingClientRect().top-20; if(Math.abs(d)>2&&window.scrollBy) window.scrollBy({top:d,behavior:"smooth"}); }
+function frameTree(){ const bx=$("ingr").closest(".box")||$("ingr"), d=bx.getBoundingClientRect().top-12; if(Math.abs(d)>2&&window.scrollBy) window.scrollBy({top:d,behavior:"smooth"}); }
 // Ctrl + scroll zooms on the spot under the mouse.
 // The plain scroll wheel moves the tree up and down, but only while the tree window is the thing framed on screen and the
 // tree has more to show in that direction. Otherwise, and once the tree reaches its edge, the wheel scrolls the page as usual.
 $("ingr").addEventListener("wheel",e=>{ const flow=$("ingr"), zw=flow.firstElementChild; if(!zw) return;
   if(!e.ctrlKey){ const r=flow.getBoundingClientRect(), h=zw.offsetHeight*treeZoom, ch=flow.clientHeight;
     const dy=e.deltaMode===1?e.deltaY*40:(e.deltaMode===2?e.deltaY*ch:e.deltaY), more=dy>0?treeY+h>ch+1:treeY<-1;
-    if(Math.abs(r.top-20)>40) return;
+    if(Math.abs((flow.closest(".box")||flow).getBoundingClientRect().top-12)>40) return;
     // a sideways wheel (or Shift + wheel) slides the tree left and right the same way
     const k=e.deltaMode===1?40:1, dx=(e.deltaX||(e.shiftKey?e.deltaY:0))*k;
     if(dx){ const w=zw.offsetWidth*treeZoom, cw=flow.clientWidth; if(dx>0?treeX+w>cw+1:treeX<-1){ e.preventDefault();
