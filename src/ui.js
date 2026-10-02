@@ -228,14 +228,24 @@ function sizing(root,cs){
   { const b=best(fitC); addRow(b, b&&round(b.r)?"Biggest round size that fits":"Biggest that fits"); }
   addRow(best(tightC), "Tight squeeze");
   addRow(best(overC.filter(c=>c.r<=overC[0].r*1.3),true), "First size that won't fit");
+  // The most this tile can hold, whatever that does to the machine counts. The sizes above only step in whole machines,
+  // but a bus connection or the tile can run out between two of those steps: then the real limit is a size where the
+  // last machine runs part of the time. anyC is the most that fits comfortably, anyT the most as a tight squeeze.
+  const okAt=(r,tight)=>connAt(r)<=connMax&&fillAt(r)[tight?0:1]<=100;
+  const most=tight=>{ let lo=step/1024; if(!okAt(lo,tight)) return 0; let hi=lo; for(let i=0;i<40&&okAt(hi,tight);i++){ lo=hi; hi*=2; } if(okAt(hi,tight)) return hi;
+    for(let i=0;i<50;i++){ const m=(lo+hi)/2; if(okAt(m,tight)) lo=m; else hi=m; } const p=Math.pow(10,2-Math.floor(Math.log10(lo))); return Math.floor(lo*p)/p; };
+  const anyC=most(false), anyT=most(true);
+  const offer=(r,label)=>{ if(!(r>0)||cand.some(c=>c.cls!=="over"&&c.r>=r*0.999)) return; const [lo,hi]=fillAt(r), ev=evenness(r);
+    addRow({r,lo,hi,conn:connAt(r),cOver:false,cls:hi<=100?"fit":"tight",half:ev.half,odd:ev.odd},label); };
+  offer(anyC,"Most that fits"); if(anyT>anyC) offer(anyT,"Most as a tight squeeze");
   const pick=[...pickMap.values()].sort((a,b)=>a[0].r-b[0].r);
-  return {one,selfFuel,selfFert,FUELN,FERTN,fuelRaw,CONN,connMax,fuel1,perUnit,outUnit,stations,connAt,block,step,cp,fillAt,evenness,cand,pick,fitC,tightC,overC,round};
+  return {one,selfFuel,selfFert,FUELN,FERTN,fuelRaw,CONN,connMax,fuel1,perUnit,outUnit,stations,connAt,block,step,cp,fillAt,evenness,cand,pick,fitC,tightC,overC,round,anyC,anyT};
 }
 // Opens a module at the biggest size that fits its tile with every machine count whole;
 // failing that the biggest that fits at all, then the smallest tight squeeze, then one machine.
 function startRate(root){ const z=sizing(root,cuts(root)); const fit=z.pick.map(p=>p[0]).filter(c=>c.cls==="fit");
   const whole=fit.filter(c=>!c.odd&&!c.half); const lastOf=a=>a.length?a[a.length-1]:null;
-  const c=lastOf(whole)||lastOf(fit)||z.tightC[0]; return c?c.r:z.step; }
+  const c=lastOf(whole)||lastOf(fit)||z.tightC[0]; return c?c.r:(z.anyT||z.step); }
 function openMod(root){ cur=root; $("rate").value=+startRate(root).toPrecision(5); setTab("mods"); renderList(); renderMod(); window.scrollTo&&window.scrollTo(0,0); }
 const rowKV=(k,v,sub)=>`<div class="row"><span>${k}${sub?` <small class="mut">${sub}</small>`:""}</span><span>${v}</span></div>`;
 // Everything a module handles, as a graph. depth = steps from the finished item (the longest way round),
@@ -442,7 +452,7 @@ if(document.fonts&&document.fonts.ready) document.fonts.ready.then(layoutTree);
 function renderMod(){
   if(!cur) return; const root=cur, rate=Math.max(0,+$("rate").value||0), cs=cuts(root), L=line();
   const sol=C.solve(root,rate,cs);
-  const {one,selfFuel,selfFert,FUELN,FERTN,fuelRaw,CONN,connMax,fuel1,perUnit,outUnit,stations,connAt,block,step,cp,fillAt,evenness,cand,pick,fitC,tightC,overC,round}=sizing(root,cs);
+  const {one,selfFuel,selfFert,FUELN,FERTN,fuelRaw,CONN,connMax,fuel1,perUnit,outUnit,stations,connAt,block,step,cp,fillAt,evenness,cand,pick,fitC,tightC,overC,round,anyC,anyT}=sizing(root,cs);
   // the arrows on the output box step by 1 from one upwards and by 0.01 below one
   $("rate").step=rate<1?0.01:1; lastRate=rate;
   $("mname").textContent=root;
@@ -454,7 +464,7 @@ function renderMod(){
   const evTxt=c=>c.odd?plural(c.odd,"machine count")+" uneven":(c.half?"All whole, except "+(c.half===1?"one machine":c.half+" machines")+" at half":"All machine counts whole");
   let rows=""; for(const [c,what] of pick){ const [cc,t]=c.cOver?["over","Too big"]:verdict(c.lo,c.hi);
     rows+=`<tr class="${Math.abs(c.r-rate)<1e-6?"sel":""}"><td>${what}</td><td class="num">${fmt(c.r)}/min</td><td class="num">${Math.round(c.lo)}–${Math.round(c.hi)}%</td><td><span class="fitpill ${cc}">${t}</span>${c.cOver?` <small class="mut">needs ${c.conn} bus connections</small>`:""}</td><td class="num">${c.conn} of ${connMax}</td><td>${evTxt(c)}</td><td><button class="link" data-rate="${c.r}">Use this</button></td></tr>`; }
-  if(!fitC.length&&!tightC.length) rows=`<tr><td colspan="7" class="empty">Even the smallest size is too big for this tile.</td></tr>`+rows;
+  if(!anyT) rows=`<tr><td colspan="7" class="empty">Even the smallest size is too big for this tile.</td></tr>`+rows;
   const evNow=evenness(rate);
   let mC=0,mT=0,bC=0,bT=0;
   for(let k=1;k<=800;k++){ const r=k*step, [lo,hi]=fillAt(r); if(connAt(r)>connMax) break; if(hi<=100) mC=r; if(lo<=100) mT=r; else break; }
@@ -466,7 +476,7 @@ function renderMod(){
     <div class="maxline">
       <div><span class="lab">Clean block</span> <b>${fmt(block)}/min</b> <span class="fitsub">smallest size with every machine count whole</span></div>
       <div><span class="lab">Most that fits, clean blocks</span> ${bC?`<b>${fmt(bC)}/min</b> comfortably`:`<b>none</b> comfortably`}${bT>bC?` · <b>${fmt(bT)}/min</b> as a tight squeeze`:""}</div>
-      <div><span class="lab">Most that fits, any size</span> ${mC?`<b>${fmt(mC)}/min</b> comfortably`:`<b>none</b> comfortably`}${mT>mC?` · <b>${fmt(mT)}/min</b> as a tight squeeze`:""} <span class="fitsub">in steps of one ${esc(fin.machine)}, ${fmt(step)}/min each</span></div>
+      <div><span class="lab">Most that fits, any size</span> ${anyC?`<b>${fmt(anyC)}/min</b> comfortably`:`<b>none</b> comfortably`}${anyT>anyC?` · <b>${fmt(anyT)}/min</b> as a tight squeeze`:""}</div>
     </div>
     <div class="tablebox inner"><table class="fitt"><thead><tr><th>Sizes worth building in this tile</th><th class="num">Output</th><th class="num">Fill</th><th>Verdict</th><th class="num">Bus connections</th><th>Machine counts</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="fitsub">Fill is the machines' own size, plus a stone furnace under each group of heated machines, times 2.4–2.8 for belts, lifts and stands. Knowledge altars, splitters and chests aren't counted.</p></div>`;

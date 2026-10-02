@@ -95,6 +95,10 @@ must(/Coke Powder/.test(strip(els.busin.innerHTML)) && !/Coke [^P]/.test(strip(e
 // steel ingot has other uses, so it still ships and gears are made on site
 must(api.status('Steel Ingot').code === 'ded' && api.status('Steel Gear').code === 'no', 'steel ingot should ship and steel gears be made on site');
 doc.getElementById('fuelsel').value = 'Coke Powder'; doc.getElementById('fuelsel').onchange();
+// when a bus connection runs out between two whole-machine sizes, the size table still offers the most that fits
+api.openMod('Gold Dust');
+must(/Most that fits/.test(strip(els.fit.innerHTML)) && !/Even the smallest size is too big/.test(strip(els.fit.innerHTML)), 'gold dust should be offered the most that fits its bus connections: ' + strip(els.fit.innerHTML).slice(0, 300));
+must(+els.rate.value > 0 && /of 8/.test(strip(els.conn.innerHTML)) && !/(9|1\d) of 8/.test(strip(els.conn.innerHTML)), 'gold dust should open at a size its bus connections allow: ' + els.rate.value + ' ' + strip(els.conn.innerHTML).slice(-40));
 // the recommended layout: fuel, fertilizer and relics each share a wagon type, sell-only things ride the shop wagon
 const where = n => api.valueOf(api.status(n));
 must(where('Coke Powder') === 'tag:fuel' && where('Advanced Fertilizer') === 'tag:fert' && where('Jupiter') === 'tag:research', 'fuel, fertilizer and relics should start on their shared wagons');
