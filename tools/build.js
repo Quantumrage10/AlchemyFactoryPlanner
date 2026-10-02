@@ -111,7 +111,7 @@ api.clearPlan(); api.openMod('Sol'); els.rate.value = '0.01'; els.rate.oninput()
 api.resetPlan();
 // the ingredient tree's rules hold for every module in the game, three ways: the recommended plan, everything made
 // inside, and everything made inside at a different size
-{ const check = label => { for (const m of api.modNames()) { api.openMod(m); const bad = api.treeProblems(); must(!bad.length, 'ingredient tree, ' + label + ', ' + m + ': ' + bad.slice(0, 3).join(' | ')); } };
+{ const check = label => { for (const m of api.modNames()) { api.openMod(m); const bad = api.treeProblems(); must(!els.ingr.innerHTML.includes('"amt">0/min<'), 'ingredient tree, ' + label + ', ' + m + ': a box is shown making 0/min'); must(!bad.length, 'ingredient tree, ' + label + ', ' + m + ': ' + bad.slice(0, 3).join(' | ')); } };
   check('recommended plan');
   api.clearPlan(); check('everything made inside');
   for (const m of api.modNames()) { api.openMod(m); els.rate.value = String(+els.rate.value * 7.3 || 3); els.rate.oninput(); const bad = api.treeProblems(); must(!bad.length, 'ingredient tree, everything made inside at another size, ' + m + ': ' + bad.slice(0, 3).join(' | ')); }

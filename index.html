@@ -693,7 +693,7 @@ function makeCore(DATA){
 const C=makeCore(DATA), I=C.I, R=C.R;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-function fmt(x){ if(!isFinite(x)) return "—"; if(Math.abs(x)<1e-9) return "0"; const a=Math.abs(x); if(a>=1000) return Math.round(x).toLocaleString(); if(a>=100) return x.toFixed(0); if(a>=10) return (+x.toFixed(1)).toString(); return (+x.toFixed(2)).toString(); }
+function fmt(x){ if(!isFinite(x)) return "—"; if(Math.abs(x)<1e-9) return "0"; const a=Math.abs(x); if(a>=1000) return Math.round(x).toLocaleString(); if(a>=100) return x.toFixed(0); if(a>=10) return (+x.toFixed(1)).toString(); if(a>=0.1) return (+x.toFixed(2)).toString(); return (+x.toPrecision(2)).toString(); }
 const plural=(n,w)=>n+" "+(n===1?w:(/y$/.test(w)?w.slice(0,-1)+"ies":(/s$/.test(w)?w:w+"s")));
 const listAnd=a=>a.length<=1?a.join(""):a.length===2?a.join(" and "):a.slice(0,-1).join(", ")+" and "+a[a.length-1];
 $("ver").textContent="game "+DATA.version;
@@ -1233,7 +1233,8 @@ if(document.fonts&&document.fonts.ready) document.fonts.ready.then(layoutTree);
 function buildTree(root,rate,cs,pos){ const eps=1e-9; let taken={}, T=null;
   const build=()=>{ const nodes=[]; let nid=0;
     const expand=(n,q,parent,depth)=>{ const r=R[n], nd={key:(parent?parent.key:"")+">"+n,n,q,parent,depth,kids:[],out:{},by:[],id:++nid}; nodes.push(nd);
-      nd.made=Math.max(0,q-Math.min(q,taken[nd.key]||0)); nd.full=!!parent&&q>eps&&nd.made<=Math.max(eps,q*1e-7);
+      // what byproducts leave to be made; a leftover of less than a hundredth of a percent is the sums not quite settling, and counts as nothing
+      nd.made=Math.max(0,q-Math.min(q,taken[nd.key]||0)); if(parent&&nd.made<=Math.max(eps,q*1e-4)) nd.made=0; nd.full=!!parent&&q>eps&&nd.made===0;
       const open=(!parent||!cs.has(n))&&r&&I[n].kind!=="raw";
       if(open&&depth<40&&!nd.full&&nd.made>eps){ const yl=C.yieldOf(r), crafts=nd.made/(r.outs[n]*yl); nd.ran=true;
         for(const o in r.outs) if(o!==n) nd.out[o]=crafts*r.outs[o]*yl;
