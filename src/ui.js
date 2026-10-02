@@ -12,6 +12,7 @@ const maxTier=Math.max(...Object.values(I).map(i=>i.tier));
 for(let t=1;t<=maxTier;t++){ const o=document.createElement("option"); o.value=t; o.textContent=t; $("tier").appendChild(o); }
 $("tier").value=maxTier;
 // your settings are remembered in this browser
+let FIRST_VISIT=false; try{ FIRST_VISIT=!localStorage.getItem("bsp_settings_v2"); }catch(e){}
 const SET_IDS=["tier","fe","mL","mW","mH","connmax","lvlbelt","lvlspeed","lvlalch","lvlfert","lvlsell"];
 // Set every setting explicitly: the saved value if there is one, otherwise the default.
 // (Browsers refill form fields by position after a reload, which put old values in the wrong boxes.)
@@ -31,11 +32,25 @@ const tierMax=()=>+$("tier").value;
 const fe=()=>Math.max(0,+$("fe").value||0);
 const inTier=n=>I[n]&&I[n].tier<=tierMax();
 
-// ---------- your own decisions: one per item, applied to every module (kept in this browser only) ----------
-let choice={};
-try{ choice=JSON.parse(localStorage.getItem("bsp_choice")||"{}")||{}; }catch(e){ choice={}; }
-const saveChoice=()=>{ try{ localStorage.setItem("bsp_choice",JSON.stringify(choice)); }catch(e){} };
-function decide(item,to){ if(to===null) delete choice[item]; else choice[item]=to; saveChoice(); redrawAll(); }
+// ---------- your plan: where every item goes, and the shared wagon types (kept in this browser only) ----------
+// What we recommend is only the starting layout. plan.place holds what you have changed (item -> "off", "maybe",
+// "own" or "tag:<id>"), plan.tags the shared wagon types, and plan.cleared means nothing is recommended at all.
+const DEFAULT_TAGS=()=>[{id:"research",name:"research"},{id:"fuel",name:"fuel"},{id:"fert",name:"fertilizer"},{id:"shop",name:"shop"}];
+const TAGNOTE={research:"Relics. Research and the shop take any of them.",fuel:"Anything that burns. A furnace takes whichever one turns up.",fert:"Anything that feeds a nursery. A nursery takes whichever one turns up.",
+  shop:"Things that are only sold and used nowhere else. Don't run it as a ring: unload everything at the shop and send whatever is left to knowledge altars."};
+let plan={place:{},tags:DEFAULT_TAGS(),cleared:false};
+try{ const sv=JSON.parse(localStorage.getItem("bsp_plan_v1")||"null");
+  if(sv&&typeof sv==="object"){ if(sv.place&&typeof sv.place==="object") plan.place=sv.place; if(Array.isArray(sv.tags)) plan.tags=sv.tags.filter(t=>t&&t.id&&t.name); plan.cleared=!!sv.cleared; }
+  else { const old=JSON.parse(localStorage.getItem("bsp_choice")||"{}")||{}; for(const k in old) plan.place[k]=old[k]==="bus"?"own":"off"; } }catch(e){}
+const savePlan=()=>{ try{ localStorage.setItem("bsp_plan_v1",JSON.stringify(plan)); }catch(e){} };
+const tagById=id=>plan.tags.find(t=>t.id===id);
+const valueOf=s=>s.code==="no"?"off":s.code==="maybe"?"maybe":s.code==="ded"?"own":"tag:"+s.wagon;
+const recValue=n=>plan.cleared?"off":valueOf(rec(n));
+// put an item somewhere; putting it back where it would be anyway just forgets the change
+function setPlace(item,v){ if(v==null||v===recValue(item)) delete plan.place[item]; else plan.place[item]=v; savePlan(); redrawAll(); }
+// the buttons in the module view: "bus" puts it where we would recommend it rides, "off" keeps it off, null undoes
+function decide(item,to){ if(!to) return setPlace(item,null); if(to==="off") return setPlace(item,"off");
+  const r=rec(item); if(r.code==="mix"||r.code==="ded") return setPlace(item,valueOf(r)); const w=wagonOf(item); setPlace(item,w&&tagById(w)?"tag:"+w:"own"); }
 
 // ---------- the bus line for the current tier and tile size ----------
 let LINE=null, lineKey="";
@@ -46,16 +61,32 @@ function applyUpgrades(){ const v=id=>+$(id).value||0; C.setSupplies($("fuelsel"
   $("connnote").textContent="each carries "+fmt(2*u.belt)+"/min (two belts)"; return u; }
 const price=n=>Math.round((I[n].sell||0)*C.sellMult()*10)/10;
 function line(){ const k=tierMax()+"|"+cap()+"|"+C.belt()+"|"+C.speed()+"|"+C.yieldOf({machine:"Extractor"})+"|"+C.fertValue()+"|"+C.fuel()+"|"+C.fert(); if(k!==lineKey){ LINE=C.busLine(tierMax(),cap()); lineKey=k; } return LINE; }
-// Where an item stands. code: ded (own wagon type), mix (shared research wagon), maybe, no
-function status(n){
+// Which shared wagon type an item would ride: anything that burns the fuel wagon, anything that feeds nurseries
+// the fertilizer wagon, relics the research wagon. null = none of them.
+function wagonOf(n){ const it=I[n]; if(it.relic) return "research"; const f=it.heat>0, g=it.nutr>0&&it.fspeed>0;
+  if(f&&g) return (n===C.fert()&&n!==C.fuel())?"fert":"fuel"; return f?"fuel":g?"fert":null; }
+const SHAREWHY={fuel:" It rides the shared fuel wagon type with everything else that burns.",fert:" It rides the shared fertilizer wagon type with everything else that feeds nurseries."};
+// What we recommend for an item. code: ded (own wagon type), mix (a shared wagon type; wagon says which), maybe, no
+function rec(n){ const s=statusBase(n); if(s.code==="mix"&&!s.wagon) s.wagon="research";
+  if(s.code==="ded"){ const w=wagonOf(n); if(w){ s.code="mix"; s.wagon=w; s.why+=SHAREWHY[w]||""; } }
+  if(s.code==="mix"&&!tagById(s.wagon)){ s.code="ded"; delete s.wagon; } return s; }
+// Where an item stands: what you set, or else the recommendation (or nothing, once recommendations are cleared)
+function status(n){ const p=plan.place[n], L=line(), it=I[n];
+  if(p==="off") return {code:"no",mine:true,why:"Your choice. Every module that needs it makes its own."+(L.bus.has(n)&&L.forcedBy[n]?" Check those modules still fit: the "+listAnd(L.forcedBy[n].slice(0,3))+" module didn't have room for it.":"")};
+  if(p==="maybe") return {code:"maybe",mine:true,why:"Your choice. Marked as a maybe. Until you decide, every module that needs it makes its own."};
+  if(p==="own") return {code:"ded",mine:true,why:"Your choice. It gets its own tagged wagons, and every module that needs it takes it off the bus."};
+  if(p&&p.slice(0,4)==="tag:"&&tagById(p.slice(4))){ const t=tagById(p.slice(4)); return {code:"mix",wagon:t.id,mine:true,why:"Your choice. It rides the shared \""+t.name+"\" wagon type, and every module that needs it takes it off that wagon."}; }
+  if(plan.cleared) return {code:"no",why:(it.kind==="made"&&!it.liq)?"Recommendations are cleared. It stays off the bus until you put it somewhere.":"Made or bought right where it's used."};
+  return rec(n); }
+function statusBase(n){
   const it=I[n], L=line(); const users=it.uses.filter(inTier); const made=it.kind==="made"&&!it.liq;
   const usesTxt=listAnd(users.slice(0,4))+(users.length>4?" and others":"");
-  if(choice[n]==="bus") return {code:"ded",mine:true,why:"Your choice. Every module that needs it takes it off the bus."};
-  if(choice[n]==="off") return {code:"no",mine:true,why:"Your choice. Every module that needs it makes its own."+(L.bus.has(n)&&!C.UNIVERSAL.includes(n)?" Check those modules still fit: the "+listAnd((L.forcedBy[n]||[]).slice(0,3))+" module didn't have room for it.":"")};
   if(C.UNIVERSAL.includes(n)){ const isFuel=n===C.fuel(), isFert=n===C.fert();
     return {code:"ded",why:"Always. It's "+(isFuel&&isFert?"the fuel and the fertilizer":isFuel?"the fuel":"the fertilizer")+" you've picked for "+(isFuel&&isFert?"the whole base":isFuel?"every heated machine":"every nursery")+"."+(users.length?" "+usesTxt+" also use"+(users.length>1?"":"s")+" it as an ingredient.":"")}; }
   if(it.relic) return {code:"mix",why:"A relic. It only goes to the shop and to research, so it rides one shared \"research\" wagon type with the other relics."+(users.length?" "+usesTxt+" also take"+(users.length>1?"":"s")+" it off that wagon.":"")};
   if(L.bus.has(n)){ const fb=L.forcedBy[n]||[]; return {code:"ded",why:"The "+listAnd(fb.slice(0,3))+" module"+(fb.length>1?"s":"")+" can't fit making "+(fb.length>1?"their":"its")+" own "+n.toLowerCase()+" in one tile."}; }
+  if(made&&!it.uses.length&&wagonOf(n)) return {code:"no",why:"Nothing uses it as an ingredient. It's "+(it.heat>0&&it.nutr>0?"a fuel and a fertilizer":it.heat>0?"a fuel":"a fertilizer")+(it.sell?", and it sells":"")+". It stays off the bus until you pick it on the setup page or put it on a wagon yourself."};
+  if(made&&it.sell&&!it.uses.length) return {code:"mix",wagon:"shop",why:"Only sold, and nothing else uses it. It rides the shared shop wagon type. Unload everything at the shop and send what's left to knowledge altars, or set it to off the bus and make it next to the shop."};
   if(it.liq) return {code:"no",why:"Hard no. A liquid, piped inside whatever uses it."};
   if(it.kind==="raw") return {code:"no",why:"Hard no. Bought with coins inside whatever uses it."};
   if(it.kind==="crop") return {code:"no",why:"Hard no. Grown in nurseries inside whatever uses it."};
@@ -68,51 +99,76 @@ function status(n){
   return {code:"no",why:"Nothing at this tier uses it."};
 }
 const onBus=n=>{ const c=status(n).code; return c==="ded"||c==="mix"; };
-function cutsFor(root){ const s=new Set(); for(const n in I) if(n!==root&&inTier(n)&&I[n].kind==="made"&&!I[n].liq&&onBus(n)) s.add(n); for(const u of C.UNIVERSAL) if(u!==root) s.add(u); return s; }
+function cutsFor(root){ const s=new Set(); for(const n in I) if(n!==root&&inTier(n)&&I[n].kind==="made"&&!I[n].liq&&onBus(n)) s.add(n); return s; }
 let cutCache={}, cutKey="";
-function cuts(root){ const k=lineKey+"|"+JSON.stringify(choice); if(k!==cutKey){ cutCache={}; cutKey=k; } return cutCache[root]||(cutCache[root]=cutsFor(root)); }
+function cuts(root){ const k=lineKey+"|"+JSON.stringify(plan); if(k!==cutKey){ cutCache={}; cutKey=k; } return cutCache[root]||(cutCache[root]=cutsFor(root)); }
 const verdict=(lo,hi)=>hi<=100?["ok","Fits"]:(lo<=100?["edge","Tight squeeze"]:["over","Too big"]);
 const SLABEL={ded:"Yes · own wagons",mix:"Yes · shared wagon",maybe:"Maybe",no:"No"};
+const label=st=>st.code==="mix"?"Yes · "+((tagById(st.wagon)||{}).name||"shared")+" wagon":SLABEL[st.code];
 const SORD={ded:0,mix:1,maybe:2,no:3};
 
 // ---------- tab 1: what goes on the bus ----------
-const flt={ded:true,mix:true,maybe:true,no:true,sold:false,basic:true};
+const flt={ded:true,mix:true,maybe:true,no:true,sold:false,fuel:false,fert:false,res:false,basic:true};
 function tog(id,key){ const b=$(id); b.setAttribute("aria-pressed",flt[key]); b.onclick=()=>{ flt[key]=!flt[key]; b.setAttribute("aria-pressed",flt[key]); renderItems(); }; }
-tog("f-ded","ded"); tog("f-mix","mix"); tog("f-maybe","maybe"); tog("f-no","no"); tog("f-sold","sold"); tog("f-basic","basic");
+tog("f-ded","ded"); tog("f-mix","mix"); tog("f-maybe","maybe"); tog("f-no","no"); tog("f-sold","sold"); tog("f-fuel","fuel"); tog("f-fert","fert"); tog("f-res","res"); tog("f-basic","basic");
 let sortK="bus", sortDir=1;
+// the picker: where this item goes. Every made item can be off the bus, a maybe, on its own wagons, or on any shared wagon.
+function picker(n,st){ const cur=valueOf(st);
+  const opts=[["off","Off the bus"],["maybe","Maybe"],["own","On the bus · own wagons"]].concat(plan.tags.map(t=>["tag:"+t.id,"On the bus · "+t.name+" wagon"]));
+  return `<select class="pick" data-item="${esc(n)}" aria-label="Where ${esc(n)} goes">`+opts.map(([v,l])=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(l)}</option>`).join("")+"</select>"+(st.mine?`<button class="swap" data-item="${esc(n)}" data-to="">Undo my choice</button>`:""); }
 function itemRow(n){
   const it=I[n]; const made=it.kind==="made"&&!it.liq; const st=status(n); const users=it.uses.filter(inTier);
   return {n,it,st,users,made};
 }
-const KEY={item:r=>r.n,bus:r=>SORD[r.st.code],why:r=>r.st.why,used:r=>r.users.join(", ")||"~",sell:r=>r.it.sell||0,tier:r=>r.it.tier};
+const KEY={item:r=>r.n,bus:r=>SORD[r.st.code]*1000+(r.st.code==="mix"?plan.tags.findIndex(t=>t.id===r.st.wagon)+1:0),why:r=>r.st.why,used:r=>r.users.join(", ")||"~",sell:r=>r.it.sell||0,tier:r=>r.it.tier};
 $("sorthead").addEventListener("click",e=>{ const b=e.target.closest(".sortb"); if(!b) return; const k=b.dataset.k; if(sortK===k) sortDir=-sortDir; else{ sortK=k; sortDir=1; } renderItems(); });
 function renderItems(){
   document.querySelectorAll(".sortb").forEach(x=>{ const on=x.dataset.k===sortK; x.dataset.dir=on?(sortDir>0?"asc":"desc"):""; });
   const q=$("q").value.trim().toLowerCase();
   let rows=Object.keys(I).filter(inTier).map(itemRow);
-  rows=rows.filter(r=>flt[r.st.code]&&(!flt.sold||r.it.sell)&&(!flt.basic||r.made)&&(!q||r.n.toLowerCase().includes(q)||r.users.some(u=>u.toLowerCase().includes(q))));
+  rows=rows.filter(r=>flt[r.st.code]&&(!flt.sold||r.it.sell)&&(!flt.fuel||r.it.heat>0)&&(!flt.fert||(r.it.nutr>0&&r.it.fspeed>0))&&(!flt.res||r.it.relic)&&(!flt.basic||r.made)&&(!q||r.n.toLowerCase().includes(q)||r.users.some(u=>u.toLowerCase().includes(q))));
   rows.sort((a,b)=>{ const ka=KEY[sortK](a), kb=KEY[sortK](b); let c=typeof ka==="number"?ka-kb:String(ka).localeCompare(String(kb)); if(!c) c=a.it.tier-b.it.tier||a.n.localeCompare(b.n); return c*sortDir; });
   const cnt={ded:0,mix:0,maybe:0,no:0}; rows.forEach(r=>cnt[r.st.code]++);
   $("count").textContent=rows.length+" shown: "+cnt.ded+" own wagons, "+cnt.mix+" shared wagon, "+cnt.maybe+" maybe, "+cnt.no+" no";
   $("rows").innerHTML=rows.map(r=>{
     const name=r.made?`<button class="link" data-mod="${esc(r.n)}">${esc(r.n)}</button>`:`<span class="name">${esc(r.n)}</span>`;
-    const used=[...r.users.map(u=>`<span class="chip">${esc(u)}</span>`), r.it.relic?`<span class="chip resc">Research</span>`:"", r.it.sell?`<span class="chip shopc">Shop</span>`:""].join("")||"—";
-    let act="";
-    if(r.made&&!C.UNIVERSAL.includes(r.n)){
-      if(r.st.mine) act=`<button class="swap" data-item="${esc(r.n)}" data-to="">Undo my choice</button>`;
-      else if(r.st.code==="ded"||r.st.code==="mix") act=`<button class="swap" data-item="${esc(r.n)}" data-to="off">Keep it off the bus</button>`;
-      else act=`<button class="swap" data-item="${esc(r.n)}" data-to="bus">Put it on the bus</button>`;
-    }
-    return `<tr><td class="nmc">${name}</td><td class="stc"><span class="st ${r.st.code}">${SLABEL[r.st.code]}</span>${r.st.mine?'<div class="mine">your choice</div>':""}</td><td class="why">${esc(r.st.why)}</td><td class="act">${act}</td><td class="usedc"><div class="chips">${used}</div></td><td class="num">${r.it.sell?price(r.n).toLocaleString():""}</td><td class="num">${r.it.tier}</td></tr>`; }).join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
+    const used=[...r.users.map(u=>`<span class="chip">${esc(u)}</span>`), r.it.heat>0?`<span class="chip furnc">Furnaces</span>`:"", (r.it.nutr>0&&r.it.fspeed>0)?`<span class="chip nursc">Nurseries</span>`:"", r.it.relic?`<span class="chip resc">Research</span>`:"", r.it.sell?`<span class="chip shopc">Shop</span>`:""].join("")||"—";
+    const act=r.made?picker(r.n,r.st):"";
+    return `<tr><td class="nmc">${name}</td><td class="stc"><span class="st ${r.st.code}">${esc(label(r.st))}</span>${r.st.mine?'<div class="mine">your choice</div>':""}</td><td class="why">${esc(r.st.why)}</td><td class="act">${act}</td><td class="usedc"><div class="chips">${used}</div></td><td class="num">${r.it.sell?price(r.n).toLocaleString():""}</td><td class="num">${r.it.tier}</td></tr>`; }).join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
 }
 $("q").oninput=renderItems;
 $("rows").addEventListener("click",e=>{ const s=e.target.closest(".swap"); if(s){ decide(s.dataset.item,s.dataset.to||null); return; } const b=e.target.closest("[data-mod]"); if(b) openMod(b.dataset.mod); });
-$("undoall").onclick=()=>{ choice={}; saveChoice(); redrawAll(); };
-$("choicelist").addEventListener("click",e=>{ const x=e.target.closest(".x"); if(x) decide(x.dataset.item,null); });
+$("rows").addEventListener("change",e=>{ const s=e.target.closest("select.pick"); if(s) setPlace(s.dataset.item,s.value); });
+// ---------- the board: shared wagon types, and the two big buttons ----------
+function resetPlan(){ plan={place:{},tags:DEFAULT_TAGS(),cleared:false}; savePlan(); redrawAll(); }
+function clearPlan(){ plan.place={}; plan.tags=[]; plan.cleared=true; savePlan(); redrawAll(); }
+function addTag(name){ name=String(name||"").trim(); if(!name) return null; const id="u"+Date.now().toString(36)+plan.tags.length; plan.tags.push({id,name}); savePlan(); redrawAll(); return id; }
+function renameTag(id,name){ const t=tagById(id); name=String(name||"").trim(); if(t&&name){ t.name=name; savePlan(); } redrawAll(); }
+function deleteTag(id){ plan.tags=plan.tags.filter(t=>t.id!==id); for(const k in plan.place) if(plan.place[k]==="tag:"+id) delete plan.place[k]; savePlan(); redrawAll(); }
+$("resetrec").onclick=resetPlan; $("clearall").onclick=clearPlan;
+$("addtag").onclick=()=>{ if(addTag($("newtag").value)) $("newtag").value=""; };
+// adding to a shared wagon only happens on the Add button or Enter, never just by picking or clicking away
+function addToTag(id){ const box=$("add-"+id), q=String(box.value||"").trim().toLowerCase(); if(!q) return;
+  const all=modNames(); let hit=all.find(n=>n.toLowerCase()===q); if(!hit){ const m=all.filter(n=>n.toLowerCase().includes(q)); if(m.length===1) hit=m[0]; }
+  if(hit) setPlace(hit,"tag:"+id); else box.classList&&box.classList.add("bad"); }
+$("tags").addEventListener("keydown",e=>{ const i=e.target.closest("input.addto"); if(!i) return; i.classList.remove("bad"); if(e.key==="Enter"){ e.preventDefault(); addToTag(i.dataset.tag); } });
+$("tags").addEventListener("click",e=>{ const ab=e.target.closest(".addbtn"); if(ab){ addToTag(ab.dataset.tag); return; } const d=e.target.closest(".deltag"); if(d){ deleteTag(d.dataset.tag); return; } const x=e.target.closest(".rm"); if(x) setPlace(x.dataset.item,"own"); });
+$("tags").addEventListener("change",e=>{ const r=e.target.closest("input.tagname"); if(r) renameTag(r.dataset.tag,r.value); });
+function renderBoard(){ const made=modNames(), st={}; $("madelist").innerHTML=made.map(n=>'<option value="'+esc(n)+'">').join(""); for(const n of made) st[n]=status(n);
+  const own=made.filter(n=>st[n].code==="ded").length, mem=t=>made.filter(n=>st[n].code==="mix"&&st[n].wagon===t.id);
+  const shared=plan.tags.filter(t=>mem(t).length).length, changed=Object.keys(plan.place).filter(k=>I[k]).length;
+  $("wcount").textContent="Wagon types on your bus: "+(own+shared)+" ("+own+" with their own wagons, "+shared+" shared)";
+  $("planstate").textContent=(plan.cleared?"Recommendations are cleared. ":"")+(changed?plural(changed,"item")+" set by you.":(plan.cleared?"Nothing is on the bus yet.":"This is the recommended layout."));
+  $("tags").innerHTML=plan.tags.map(t=>{ const m=mem(t), id=esc(t.id);
+    return `<div class="tagbox"><div class="taghead"><input class="tagname" data-tag="${id}" value="${esc(t.name)}" aria-label="Name of this shared wagon" autocomplete="off"><span class="mut">wagon · ${plural(m.length,"item")}</span><button class="deltag" data-tag="${id}">Delete</button></div>`
+      +(TAGNOTE[t.id]?`<div class="fitsub">${esc(TAGNOTE[t.id])}</div>`:"")
+      +`<div class="chips">${m.map(n=>`<span class="chip pick">${esc(n)} <button class="x rm" data-item="${esc(n)}" aria-label="Take ${esc(n)} off this wagon">×</button></span>`).join("")}</div>`
+      +`<div class="addrow"><input type="text" class="addto" id="add-${id}" data-tag="${id}" list="madelist" autocomplete="off" placeholder="Type an item to add…" aria-label="Item to add to this wagon"><button class="addbtn" data-tag="${id}">Add</button></div></div>`; }).join(""); }
 
 // ---------- tabs ----------
-const TABS=["items","mods","rates"];
-function setTab(w){ for(const k of TABS){ $("tab-"+k).setAttribute("aria-selected",k===w); $("pane-"+k).hidden=k!==w; } }
+const TABS=["setup","items","mods","rates"];
+function setTab(w){ for(const k of TABS){ $("tab-"+k).setAttribute("aria-selected",k===w); $("pane-"+k).hidden=k!==w; } $("ctx").hidden=w==="setup"; }
+$("ctxgo").onclick=()=>setTab("setup");
 for(const k of TABS) $("tab-"+k).onclick=()=>setTab(k);
 
 // ---------- tab 2: build a module ----------
@@ -177,10 +233,12 @@ function renderMod(){
   if(!cur) return; const root=cur, rate=Math.max(0,+$("rate").value||0), cs=cuts(root), L=line();
   const sol=C.solve(root,rate,cs);
   const {one,selfFuel,selfFert,FUELN,FERTN,fuelRaw,CONN,connMax,fuel1,perUnit,outUnit,stations,connAt,block,step,cp,fillAt,evenness,cand,pick,fitC,tightC,overC,round}=sizing(root,cs);
+  // the arrows on the output box move in steps that suit the module: half of one final machine, and never more than 1
+  $("rate").step=+Math.min(1,step/2).toPrecision(6);
   $("mname").textContent=root;
   const it=I[root], st=status(root); const users=it.uses.filter(inTier);
   const ends=[...users, it.relic?"research":"", it.sell?"the shop":""].filter(Boolean);
-  $("mmeta").innerHTML=`Tech tier ${it.tier}`+(it.sell?` · sells for ${price(root).toLocaleString()}`:"")+(ends.length?` · goes to ${esc(listAnd(ends))}`:" · nothing at this tier uses it")+` · on the bus: <b class="${st.code==="no"?"":"cu"}">${SLABEL[st.code].toLowerCase()}</b>`;
+  $("mmeta").innerHTML=`Tech tier ${it.tier}`+(it.sell?` · sells for ${price(root).toLocaleString()}`:"")+(ends.length?` · goes to ${esc(listAnd(ends))}`:" · nothing at this tier uses it")+` · on the bus: <b class="${st.code==="no"?"":"cu"}">${esc(label(st).toLowerCase())}</b>`;
 
   // --- fit ---
   const evTxt=c=>c.odd?plural(c.odd,"machine count")+" uneven":(c.half?"All whole, except "+(c.half===1?"one machine":c.half+" machines")+" at half":"All machine counts whole");
@@ -272,13 +330,14 @@ function renderRates(){
 $("rq").oninput=renderRates;
 
 // ---------- redraw ----------
-function redrawAll(){ saveSettings(); applyUpgrades(); line(); if(cur&&!inTier(cur)) cur=modNames()[0]||null; { const ks=Object.keys(choice).filter(k=>I[k]); $("choices").hidden=!ks.length;
-    $("choicelist").innerHTML=ks.map(k=>`<span class="chip pick">${esc(k)}: ${choice[k]==="bus"?"on the bus":"kept off the bus"} <button class="x" data-item="${esc(k)}" aria-label="Undo ${esc(k)}">×</button></span>`).join(""); } renderItems(); renderList(); renderMod(); renderRates(); }
+function redrawAll(){ saveSettings(); applyUpgrades(); line(); if(cur&&!inTier(cur)) cur=modNames()[0]||null; $("ctxtxt").textContent="Your setup: items up to tier "+tierMax()+" · "+dimTxt()+" tiles with "+num("connmax",8,1)+" bus connections · burning "+C.fuel()+" · feeding "+C.fert()+" · belts carry "+fmt(C.belt())+"/min.";
+  renderBoard(); renderItems(); renderList(); renderMod(); renderRates(); }
 for(const id of ["tier","fe","connmax","lvlbelt","lvlspeed","lvlalch","lvlfert","lvlsell"]) $(id).oninput=redrawAll;
 for(const id of SEL_IDS) $(id).onchange=redrawAll;
-for(const d of ["mL","mW","mH"]){ const a=$(d), b=$(d+"2"); b.value=a.value; a.oninput=()=>{ b.value=a.value; redrawAll(); }; b.oninput=()=>{ a.value=b.value; redrawAll(); }; }
+for(const d of ["mL","mW","mH"]) $(d).oninput=redrawAll;
 $("tier").onchange=redrawAll;
 applyUpgrades(); line();
 cur=I["Jupiter"]&&inTier("Jupiter")?"Jupiter":modNames()[0];
 $("rate").value=+startRate(cur).toPrecision(5);
 redrawAll();
+if(FIRST_VISIT) setTab("setup");

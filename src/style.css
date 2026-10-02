@@ -144,3 +144,46 @@ table.items td.usedc{min-width:120px;max-width:260px;width:20%}
 tr.itemhead th{white-space:nowrap}
 @media (max-width:760px){.side{display:none}.legendlist li{grid-template-columns:1fr}}
 .grp{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-width:110px}
+.board{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 16px;display:grid;gap:10px}
+.boardhead{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.boardhead .resetbtn{margin-left:0}.boardhead .resetbtn:first-of-type{margin-left:auto}
+.tags{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.tagbox{border:1px solid color-mix(in srgb,var(--gold) 40%,transparent);background:var(--gold-soft);border-radius:6px;padding:8px 10px;display:grid;gap:6px;align-content:start}
+.taghead{display:flex;gap:8px;align-items:center}
+.taghead .tagname{font-weight:600;width:130px;padding:3px 7px}
+.taghead .deltag{font:inherit;font-size:13px;margin-left:auto;background:none;border:0;color:var(--muted);cursor:pointer;text-decoration:underline}
+.taghead .deltag:hover{color:var(--copper)}
+.tagbox select.addto{font-size:13px;padding:3px 6px;max-width:100%}
+.addtagrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.addtagrow .resetbtn{margin-left:0}
+select.pick{font-size:13px;padding:3px 6px;display:block}
+table.items td.act .swap{display:block;margin-top:4px}
+.chip.furnc{border-color:color-mix(in srgb,var(--copper) 45%,transparent);color:var(--copper);background:var(--copper-soft)}
+.chip.nursc{border-color:color-mix(in srgb,var(--verd) 45%,transparent);color:var(--verd);background:var(--verd-soft)}
+.pane{display:grid;gap:14px;min-width:0}
+.pane>*{min-width:0}
+.stepn{display:inline-block;min-width:18px;height:18px;line-height:18px;margin-right:7px;border-radius:999px;background:var(--line);color:var(--ink);font-size:12px;font-weight:700;text-align:center;font-family:var(--mono)}
+.tab[aria-selected="true"] .stepn{background:var(--verd);color:var(--surface)}
+.ctx{font-size:13.5px;color:var(--muted);padding:2px 2px 0}
+.cards{display:grid;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:grid;gap:10px}
+.card h2{margin:0;font-size:17px;font-weight:600}
+.card p{margin:0}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px 16px}
+.fields.wide{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.field{display:grid;gap:4px;align-content:start;font-size:14px}
+.field>span{font-weight:600}
+.field input,.field select{width:100%;box-sizing:border-box}
+.field small{color:var(--muted);font-size:12.5px}
+.how{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 16px}
+.how summary{cursor:pointer;font-weight:600}
+.how[open] summary{margin-bottom:10px}
+.how>div{margin-top:8px}
+.how .legendlist{margin-top:10px}
+.boardbtns{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:10px}
+.boardhead .boardbtns .resetbtn{margin-left:0}
+.addrow{display:flex;gap:6px}
+.addrow input.addto{flex:1 1 auto;min-width:0;font-size:13px;padding:3px 7px}
+.addrow input.addto.bad{border-color:var(--copper)}
+.addrow .addbtn{font:inherit;font-size:13px;font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:3px 10px;color:var(--ink);cursor:pointer}
+.addrow .addbtn:hover{border-color:var(--verd);color:var(--verd)}

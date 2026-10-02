@@ -4,54 +4,78 @@
     <p class="sub">What goes on the bus, what each module needs, and whether it fits. Every number comes from the recipe data (<span id="ver"></span>) at your upgrade levels, with every machine capped at one belt of output.</p>
   </header>
 
-  <section class="rule" aria-label="Settings and the rule">
-    <div class="controls">
-      <b class="grp">Your upgrades</b>
-      <label class="inl" for="lvlbelt">Logistics (belt speed) level <input type="number" autocomplete="off" id="lvlbelt" min="0" step="1" value="0" style="width:60px"></label>
-      <label class="inl" for="lvlspeed">Factory Efficiency level <input type="number" autocomplete="off" id="lvlspeed" min="0" step="1" value="0" style="width:60px"></label>
-      <label class="inl" for="fe">Fuel Efficiency level <input type="number" autocomplete="off" id="fe" min="0" step="1" value="0" style="width:60px"></label>
-      <label class="inl" for="lvlalch">Alchemy Skill level <input type="number" autocomplete="off" id="lvlalch" min="0" step="1" value="0" style="width:60px"></label>
-      <label class="inl" for="lvlfert">Fertilizer Efficiency level <input type="number" autocomplete="off" id="lvlfert" min="0" step="1" value="0" style="width:60px"></label>
-      <label class="inl" for="lvlsell">Retail Price level <input type="number" autocomplete="off" id="lvlsell" min="0" step="1" value="0" style="width:60px"></label>
-    </div>
-    <div class="controls">
-      <b class="grp"></b>
-      <small class="mut" id="upnote"></small>
-    </div>
-    <div class="controls">
-      <b class="grp">Your base</b>
-      <label class="inl" for="fuelsel">Fuel <select id="fuelsel" autocomplete="off"></select></label>
-      <label class="inl" for="fertsel">Fertilizer <select id="fertsel" autocomplete="off"></select></label>
-    </div>
-    <div class="controls">
-      <b class="grp"></b>
-      <label class="inl" for="tier">Show items up to tier <select id="tier" autocomplete="off"></select></label>
-      <span class="inl">Tile size <label for="mL" class="vh">Length</label><input type="number" autocomplete="off" id="mL" min="1" step="1" value="14" style="width:54px"> × <label for="mW" class="vh">Width</label><input type="number" autocomplete="off" id="mW" min="1" step="1" value="14" style="width:54px"> × <label for="mH" class="vh">Height</label><input type="number" autocomplete="off" id="mH" min="1" step="1" value="15" style="width:54px"> <small class="mut">L × W × H</small></span>
-      <label class="inl" for="connmax">Bus connections per tile <input type="number" autocomplete="off" id="connmax" min="1" step="1" value="8" style="width:56px"> <small class="mut" id="connnote"></small></label>
-    </div>
-    <div><b>How the bus line is drawn.</b> A module makes everything it needs inside its own tile, from coins, whenever that fits. Each item then lands in one of four places:</div>
-    <ul class="legendlist">
-      <li><span class="st ded">Yes · own wagons</span> A module that needs it can't fit making it, so it gets its own module and its own tagged wagons. The fuel and fertilizer you've picked are always here.</li>
-      <li><span class="st mix">Yes · shared wagon</span> Relics. They only go to the shop and to research, so they can all ride one "research" wagon type instead of one each.</li>
-      <li><span class="st maybe">Maybe</span> Packed-down items that only one or two things use. They fit inside the module that uses them, or you can give them their own module and bus them. Your call.</li>
-      <li><span class="st no">No</span> Bulk, raw, grown or liquid stuff, and things that are only sold. Made right where they're used, or next to the shop.</li>
-    </ul>
-    <div class="mut">Press "Put it on the bus" or "Keep it off the bus" on any item and every module that uses it updates to match.</div>
-  </section>
 
-  <div class="choices" id="choices" hidden>
-    <b>Your choices</b>
-    <span id="choicelist" class="chips"></span>
-    <button class="resetbtn" id="undoall">Reset all to defaults</button>
-  </div>
+
 
   <div class="tabs" role="tablist">
-    <button class="tab" role="tab" id="tab-items" aria-selected="true" aria-controls="pane-items">What goes on the bus</button>
-    <button class="tab" role="tab" id="tab-mods" aria-selected="false" aria-controls="pane-mods">Build a module</button>
+    <button class="tab" role="tab" id="tab-setup" aria-selected="false" aria-controls="pane-setup"><span class="stepn">1</span>Set up your base</button>
+    <button class="tab" role="tab" id="tab-items" aria-selected="true" aria-controls="pane-items"><span class="stepn">2</span>Plan your bus</button>
+    <button class="tab" role="tab" id="tab-mods" aria-selected="false" aria-controls="pane-mods"><span class="stepn">3</span>Build a module</button>
     <button class="tab" role="tab" id="tab-rates" aria-selected="false" aria-controls="pane-rates">Machine rates</button>
   </div>
 
+  <div class="ctx" id="ctx"><span id="ctxtxt"></span> <button class="link" id="ctxgo">Change</button></div>
+
+  <section id="pane-setup" role="tabpanel" aria-labelledby="tab-setup" class="pane" hidden>
+    <div class="cards">
+      <section class="card" aria-labelledby="h-up">
+        <h2 id="h-up">Your upgrades</h2>
+        <p class="mut">Copy the levels from your upgrade screen. Leave at 0 anything you haven't bought.</p>
+        <div class="fields">
+        <label class="field" for="lvlbelt"><span>Logistics</span><input type="number" autocomplete="off" id="lvlbelt" min="0" step="1" value="0"><small>belt speed</small></label>
+        <label class="field" for="lvlspeed"><span>Factory Efficiency</span><input type="number" autocomplete="off" id="lvlspeed" min="0" step="1" value="0"><small>machine speed</small></label>
+        <label class="field" for="fe"><span>Fuel Efficiency</span><input type="number" autocomplete="off" id="fe" min="0" step="1" value="0"><small>heat from each fuel</small></label>
+        <label class="field" for="lvlalch"><span>Alchemy Skill</span><input type="number" autocomplete="off" id="lvlalch" min="0" step="1" value="0"><small>extractor and alembic output</small></label>
+        <label class="field" for="lvlfert"><span>Fertilizer Efficiency</span><input type="number" autocomplete="off" id="lvlfert" min="0" step="1" value="0"><small>how far fertilizer goes</small></label>
+        <label class="field" for="lvlsell"><span>Sales Ability</span><input type="number" autocomplete="off" id="lvlsell" min="0" step="1" value="0"><small>shop prices</small></label>
+        </div>
+        <p class="mut" id="upnote"></p>
+      </section>
+      <section class="card" aria-labelledby="h-base">
+        <h2 id="h-base">What your base runs on</h2>
+        <p class="mut">The fuel your furnaces burn, the fertilizer your nurseries are fed, and how far through the tech tree you are.</p>
+        <div class="fields wide">
+          <label class="field" for="fuelsel"><span>Fuel</span><select id="fuelsel" autocomplete="off"></select><small>used to work out how much fuel each module burns</small></label>
+          <label class="field" for="fertsel"><span>Fertilizer</span><select id="fertsel" autocomplete="off"></select><small>used to work out how fast nurseries grow</small></label>
+          <label class="field" for="tier"><span>Show items up to tier</span><select id="tier" autocomplete="off"></select><small>hides everything you haven't unlocked</small></label>
+        </div>
+      </section>
+      <section class="card" aria-labelledby="h-tile">
+        <h2 id="h-tile">Your tiles</h2>
+        <p class="mut">The space one module gets, and how many bus stations it can have. An item only goes on the bus when a module can't fit making it in this space.</p>
+        <div class="fields">
+          <label class="field" for="mL"><span>Length</span><input type="number" autocomplete="off" id="mL" min="1" step="1" value="14"><small>blocks</small></label>
+          <label class="field" for="mW"><span>Width</span><input type="number" autocomplete="off" id="mW" min="1" step="1" value="14"><small>blocks</small></label>
+          <label class="field" for="mH"><span>Height</span><input type="number" autocomplete="off" id="mH" min="1" step="1" value="15"><small>blocks</small></label>
+          <label class="field" for="connmax"><span>Bus connections per tile</span><input type="number" autocomplete="off" id="connmax" min="1" step="1" value="8"><small id="connnote"></small></label>
+        </div>
+      </section>
+    </div>
+    <p class="foot">Everything on the other pages follows what you set here. It's remembered in this browser only.</p>
+  </section>
+
   <section id="pane-items" role="tabpanel" aria-labelledby="tab-items" class="pane">
+  <details class="how">
+    <summary>How the bus line is drawn, and what the four labels mean</summary>
+    <div>A module makes everything it needs inside its own tile, from coins, whenever that fits. What you see below is only our recommended starting layout. Every item has a picker, so you can put anything anywhere:</div>
+    <ul class="legendlist">
+      <li><span class="st ded">Yes · own wagons</span> It gets its own module and its own tagged wagons. Recommended when a module that needs it can't fit making it.</li>
+      <li><span class="st mix">Yes · shared wagon</span> It rides a wagon type with other items. This works when the place it's going takes any of them: a furnace takes any fuel, a nursery any fertilizer, research any relic. You can still unload one particular item off a shared wagon by filtering on the cargo.</li>
+      <li><span class="st maybe">Maybe</span> Packed-down items that only one or two things use. They fit inside the module that uses them, or you can bus them. Your call.</li>
+      <li><span class="st no">No</span> Made right where it's used, or next to the shop.</li>
+    </ul>
+    <div class="mut"><b>Shared wagons push.</b> If you make too much of one item, it can fill the shared wagons before another item gets picked up. If that bites, give the item its own wagons.</div>
+  </details>
+  <section class="board" aria-label="Your bus">
+    <div class="boardhead">
+      <b id="wcount"></b>
+      <span class="mut" id="planstate"></span>
+      <div class="boardbtns"><button class="resetbtn" id="resetrec">Reset to recommended</button> <button class="resetbtn plain" id="clearall">Clear all</button></div>
+    </div>
+    <div class="mut"><b>Shared wagons.</b> Items in the same box ride one wagon type between them. Rename or delete a wagon, make your own, and add items here or with the picker in the table below.</div>
+    <div class="tags" id="tags"></div><datalist id="madelist"></datalist>
+    <div class="addtagrow"><input type="text" id="newtag" autocomplete="off" placeholder="Name a new shared wagon…" aria-label="Name a new shared wagon"> <button class="resetbtn plain" id="addtag">Add shared wagon</button></div>
+  </section>
     <div class="controls">
       <input type="search" id="q" placeholder="Search an item…" aria-label="Search items">
       <button class="pill yes" id="f-ded" aria-pressed="true">Yes · own wagons</button>
@@ -60,6 +84,9 @@
       <button class="pill site" id="f-no" aria-pressed="true">No</button>
       <span class="sep"></span>
       <button class="pill sold" id="f-sold" aria-pressed="false">Only things I sell</button>
+      <button class="pill yes" id="f-fuel" aria-pressed="false">Only fuel</button>
+      <button class="pill inside" id="f-fert" aria-pressed="false">Only fertilizer</button>
+      <button class="pill inside" id="f-res" aria-pressed="false">Only research</button>
       <button class="pill site" id="f-basic" aria-pressed="true">Hide raw, crops &amp; liquids</button>
       <span class="mut" id="count"></span>
     </div>
@@ -90,7 +117,6 @@
           <div><h2 id="mname"></h2><div class="mut" id="mmeta"></div></div>
           <div class="controls">
             <label class="inl" for="rate">Output <input type="number" autocomplete="off" id="rate" min="0" step="any" style="width:96px"> /min</label>
-            <span class="inl">Tile size <label for="mL2" class="vh">Length</label><input type="number" autocomplete="off" id="mL2" min="1" step="1" style="width:54px" title="Length"> × <label for="mW2" class="vh">Width</label><input type="number" autocomplete="off" id="mW2" min="1" step="1" style="width:54px" title="Width"> × <label for="mH2" class="vh">Height</label><input type="number" autocomplete="off" id="mH2" min="1" step="1" style="width:54px" title="Height"> <small class="mut">L × W × H</small></span>
           </div>
         </div>
         <div id="fit"></div>

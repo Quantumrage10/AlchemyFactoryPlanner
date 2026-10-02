@@ -27,16 +27,19 @@ const init = { fe: '0', mL: '14', mW: '14', mH: '15', connmax: '8', lvlbelt: '0'
 for (const k in init) doc.getElementById(k).value = init[k];
 const store = {};
 const ls = { getItem: k => store[k] || null, setItem: (k, v) => { store[k] = v; } };
-const api = new Function('document', 'localStorage', 'window', script + '\n;return {openMod,decide,status};')(doc, ls, { scrollTo() {} });
+const api = new Function('document', 'localStorage', 'window', script + '\n;return {addToTag,openMod,decide,status,setPlace,addTag,deleteTag,resetPlan,clearPlan,valueOf};')(doc, ls, { scrollTo() {} });
 const strip = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const must = (cond, msg) => { if (!cond) { console.error('Smoke test failed: ' + msg); process.exit(1); } };
 // a stylesheet that closes its own <style> tag, or contains script, spills onto the page as text
 must(!/<\/style|<script|readFileSync|require\(/i.test(css), 'src/style.css contains something that is not CSS');
 must(els.rows.innerHTML.includes('Coke Powder'), 'bus table did not render');
+must(els['pane-setup'].hidden === false && els.ctx.hidden === true, 'a first visit should open on the setup page');
+must(/14×14×15 tiles/.test(els.ctxtxt.textContent), 'the setup reminder line is missing');
 must(doc.getElementById('lvlspeed').value == 0, 'a stray value in the Factory Efficiency box was not reset to its default');
 api.openMod('Jupiter');
 must(/Flax 360\/min/.test(strip(els.ingr.innerHTML)), 'Jupiter ingredients did not render');
 must(/Advanced Fertilizer.*12\/min/.test(strip(els.busin.innerHTML)), 'Jupiter bus inputs are wrong');
+must(els.rate.step == 0.05, 'Jupiter output should step by half a machine, 0.05: ' + els.rate.step);
 api.openMod('Saturn');
 // Saturn opens at the biggest size that fits, 0.4/min: two stations each for salt, brick and glass, plus one out
 must(els.rate.value == 0.4, 'Saturn did not open at its biggest fitting size: ' + els.rate.value);
@@ -65,10 +68,11 @@ doc.getElementById('lvlsell').value = '0'; doc.getElementById('lvlsell').oninput
 // a different fuel: blast potion is far hotter than coke powder, so a glass module needs far less of it
 api.openMod('Glass');
 must(/Coke Powder/.test(strip(els.busin.innerHTML)), 'glass should burn coke powder by default');
+must(els.rate.step == 1, 'glass output should step by 1: ' + els.rate.step);
 doc.getElementById('fuelsel').value = 'Blast Potion'; doc.getElementById('fuelsel').onchange();
 api.openMod('Glass');
 must(/Blast Potion/.test(strip(els.busin.innerHTML)) && !/Coke Powder/.test(strip(els.busin.innerHTML)), 'changing the fuel did not change what glass burns: ' + strip(els.busin.innerHTML));
-must(api.status('Blast Potion').code === 'ded' && /fuel you've picked/.test(api.status('Blast Potion').why), 'the chosen fuel should be the one that is always on the bus');
+must(api.status('Blast Potion').code === 'mix' && api.status('Blast Potion').wagon === 'fuel' && /fuel you've picked/.test(api.status('Blast Potion').why), 'the chosen fuel should be the one that is always on the bus');
 must(!/fuel you've picked/.test(api.status('Coke Powder').why), 'coke powder should stop being the always-on fuel once another fuel is picked');
 // with another fuel picked, coke powder is an ordinary item: it must be the powder that ships, never coke
 must(api.status('Coke').code === 'no', 'coke should never be put on the bus: ' + api.status('Coke').why);
@@ -78,6 +82,37 @@ must(/Coke Powder/.test(strip(els.busin.innerHTML)) && !/Coke [^P]/.test(strip(e
 // steel ingot has other uses, so it still ships and gears are made on site
 must(api.status('Steel Ingot').code === 'ded' && api.status('Steel Gear').code === 'no', 'steel ingot should ship and steel gears be made on site');
 doc.getElementById('fuelsel').value = 'Coke Powder'; doc.getElementById('fuelsel').onchange();
+// the recommended layout: fuel, fertilizer and relics each share a wagon type, sell-only things ride the shop wagon
+const where = n => api.valueOf(api.status(n));
+must(where('Coke Powder') === 'tag:fuel' && where('Advanced Fertilizer') === 'tag:fert' && where('Jupiter') === 'tag:research', 'fuel, fertilizer and relics should start on their shared wagons');
+must(where('Panacea Potion') === 'off', 'panacea burns and feeds nurseries, so it should not default to the shop wagon');
+must(where('Pocket Watch') === 'tag:shop' && where('Brick') === 'own' && where('Glass') === 'own', 'only sell-only items start on the shop wagon; brick and glass keep their own wagons');
+must(/Yes · fuel wagon/.test(strip(els.rows.innerHTML)), 'the label should name the shared wagon');
+must(/Wagon types on your bus: \d+/.test(els.wcount.textContent), 'the wagon type count is missing');
+// anything can be put anywhere, and every module follows
+api.setPlace('Coke Powder', 'own');
+must(api.status('Coke Powder').code === 'ded' && api.status('Coke Powder').mine, 'an item should be movable to its own wagons');
+api.setPlace('Brick', 'maybe');
+must(api.status('Brick').code === 'maybe', 'an item should be markable as a maybe');
+const tid = api.addTag('saturn parts');
+api.setPlace('Glass', 'tag:' + tid);
+must(api.status('Glass').code === 'mix' && /Yes · saturn parts wagon/.test(strip(els.rows.innerHTML)), 'an item should be addable to a shared wagon you made');
+api.openMod('Saturn');
+must(/Glass/.test(strip(els.busin.innerHTML)) && !/Brick/.test(strip(els.busin.innerHTML)), 'modules should follow the plan: ' + strip(els.busin.innerHTML));
+doc.getElementById('add-' + tid).value = 'brick'; api.addToTag(tid);
+must(where('Brick') === 'tag:' + tid, 'typing an item and pressing Add should put it on that wagon');
+api.setPlace('Brick', 'maybe');
+api.deleteTag(tid);
+must(where('Glass') === 'own', 'deleting a shared wagon should put its items back');
+// clearing takes everything off the bus; resetting brings the recommended layout back
+api.clearPlan();
+must(where('Coke Powder') === 'off' && where('Jupiter') === 'off' && where('Glass') === 'off', 'clearing should take everything off the bus');
+must(/Wagon types on your bus: 0 /.test(els.wcount.textContent), 'a cleared plan should need no wagon types');
+must(els.tags.innerHTML === '', 'clearing should remove the shared wagons too');
+api.setPlace('Glass', 'own');
+must(where('Glass') === 'own' && where('Brick') === 'off', 'after clearing, only what you place is on the bus');
+api.resetPlan();
+must(where('Coke Powder') === 'tag:fuel' && where('Brick') === 'own', 'resetting should bring the recommended layout back');
 
 if (process.argv.includes('--fragment')) {
   fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
