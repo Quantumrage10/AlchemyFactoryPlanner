@@ -349,3 +349,38 @@ html{scroll-snap-type:none}
   #pane-items>.controls,#pane-rates>.controls{position:sticky;top:0;z-index:6;background:var(--ground);padding:8px 0;margin:-8px 0}
   #pane-items>.tablebox th,#pane-rates>.tablebox th{top:var(--toolh,0px)}
 }
+/* room above the top row for byproduct lines that loop over it, each in its own lane */
+.zw{padding-top:40px}
+/* rows sit far enough apart for a byproduct line and its arrowhead to run between them */
+.kids>.branch{padding:11px 0}
+.zw{padding-top:48px}
+.kids>.branch::after{margin-top:calc(var(--a,30px) - 12px)}
+/* pointing at lines in the tree */
+.flow.online{cursor:pointer}
+svg.bylines>path.hit{pointer-events:stroke;stroke:transparent;stroke-width:14;stroke-dasharray:none;fill:none}
+svg.bylines>path.vis.hl{stroke-width:3.5;color:var(--copper)}
+svg.bytext text.hl{fill:var(--copper);font-size:14px}
+.node.hl,.branch.hl>.node,.branch.hl>.kids>.branch>.node{outline:2px solid var(--copper);outline-offset:1px}
+.branch.hl>.kids>.branch::after{background:var(--copper)}
+.branch.hl>.kids>.branch::before{border-right-color:var(--copper)}
+.branch.hl>.stub{background:var(--copper)}
+.branch.hl>.tri{border-left-color:var(--copper)}
+/* the card that opens when a line is clicked */
+.box{position:relative}
+.treetip{position:absolute;z-index:40;width:320px;max-width:calc(100% - 16px);background:var(--surface);border:1px solid var(--copper);border-radius:8px;padding:12px 34px 12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:14px}
+.treetip[hidden]{display:none}
+.treetip h4{margin:0 0 6px;font-size:15px}
+.treetip p{margin:6px 0 0}
+.treetip ul{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:6px}
+.treetip .amt{font-family:var(--mono);font-size:12.5px;color:var(--muted);font-weight:400}
+.treetip .x{position:absolute;right:8px;top:6px;font:inherit;font-size:20px;line-height:1;border:0;background:none;color:var(--muted);cursor:pointer}
+.treetip .x:hover{color:var(--copper)}
+.treetip .goto{font-size:inherit}
+.treetip h4 .goto{font-size:15px}
+/* the eye on a box, and the bar that says the tree is cut down */
+.eye{position:absolute;top:4px;right:4px;border:0;background:none;color:var(--muted);cursor:pointer;padding:3px;line-height:0;border-radius:4px}
+.eye:hover{color:var(--verd);background:var(--surface)}
+.node:has(.eye){padding-right:26px}
+.focusbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--verd-soft);border:1px solid color-mix(in srgb,var(--verd) 40%,transparent);border-radius:6px;padding:8px 12px;font-size:14px}
+.focusbar[hidden]{display:none}
+.focusbar .resetbtn{margin-left:auto}

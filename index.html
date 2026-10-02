@@ -360,6 +360,41 @@ html{scroll-snap-type:none}
   #pane-items>.controls,#pane-rates>.controls{position:sticky;top:0;z-index:6;background:var(--ground);padding:8px 0;margin:-8px 0}
   #pane-items>.tablebox th,#pane-rates>.tablebox th{top:var(--toolh,0px)}
 }
+/* room above the top row for byproduct lines that loop over it, each in its own lane */
+.zw{padding-top:40px}
+/* rows sit far enough apart for a byproduct line and its arrowhead to run between them */
+.kids>.branch{padding:11px 0}
+.zw{padding-top:48px}
+.kids>.branch::after{margin-top:calc(var(--a,30px) - 12px)}
+/* pointing at lines in the tree */
+.flow.online{cursor:pointer}
+svg.bylines>path.hit{pointer-events:stroke;stroke:transparent;stroke-width:14;stroke-dasharray:none;fill:none}
+svg.bylines>path.vis.hl{stroke-width:3.5;color:var(--copper)}
+svg.bytext text.hl{fill:var(--copper);font-size:14px}
+.node.hl,.branch.hl>.node,.branch.hl>.kids>.branch>.node{outline:2px solid var(--copper);outline-offset:1px}
+.branch.hl>.kids>.branch::after{background:var(--copper)}
+.branch.hl>.kids>.branch::before{border-right-color:var(--copper)}
+.branch.hl>.stub{background:var(--copper)}
+.branch.hl>.tri{border-left-color:var(--copper)}
+/* the card that opens when a line is clicked */
+.box{position:relative}
+.treetip{position:absolute;z-index:40;width:320px;max-width:calc(100% - 16px);background:var(--surface);border:1px solid var(--copper);border-radius:8px;padding:12px 34px 12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:14px}
+.treetip[hidden]{display:none}
+.treetip h4{margin:0 0 6px;font-size:15px}
+.treetip p{margin:6px 0 0}
+.treetip ul{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:6px}
+.treetip .amt{font-family:var(--mono);font-size:12.5px;color:var(--muted);font-weight:400}
+.treetip .x{position:absolute;right:8px;top:6px;font:inherit;font-size:20px;line-height:1;border:0;background:none;color:var(--muted);cursor:pointer}
+.treetip .x:hover{color:var(--copper)}
+.treetip .goto{font-size:inherit}
+.treetip h4 .goto{font-size:15px}
+/* the eye on a box, and the bar that says the tree is cut down */
+.eye{position:absolute;top:4px;right:4px;border:0;background:none;color:var(--muted);cursor:pointer;padding:3px;line-height:0;border-radius:4px}
+.eye:hover{color:var(--verd);background:var(--surface)}
+.node:has(.eye){padding-right:26px}
+.focusbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--verd-soft);border:1px solid color-mix(in srgb,var(--verd) 40%,transparent);border-radius:6px;padding:8px 12px;font-size:14px}
+.focusbar[hidden]{display:none}
+.focusbar .resetbtn{margin-left:auto}
 </style>
 </head>
 <body>
@@ -491,9 +526,11 @@ html{scroll-snap-type:none}
           <div class="box"><h3>Bus connections used</h3><div id="conn"></div></div>
         </div>
         <div class="box">
-          <div class="dhead"><h3>Every ingredient, and where it comes from</h3></div>
-          <p class="fitsub">Read it left to right. Every item sits to the right of what goes into it, and the lines show what feeds what, ending at the finished item. Something used in several places shows up in each one, with the amount that place needs. A dashed arrow is a byproduct: it runs from the machine it comes out of to the item that uses it. <b>Hold Ctrl and scroll to zoom in or out on wherever your mouse is, and drag to slide it sideways.</b></p>
+          <div class="dhead"><h3>Every ingredient, and where it comes from</h3><button class="resetbtn plain" id="treereset">Reset view</button></div>
+          <p class="fitsub">Read it left to right. Every item sits to the right of what goes into it, and the lines show what feeds what, ending at the finished item. Something used in several places shows up in each one, with the amount that place needs. A dashed arrow is a byproduct: it runs from the machine it comes out of to the item that uses it. <b>Hold Ctrl and scroll to zoom in or out on wherever your mouse is, and drag to move it around. "Reset view" puts it back. Point at any line to light up what it joins, and click it to see just those things. The eye on a box shows only what goes into that box.</b></p>
+          <div class="focusbar" id="treefocus" hidden>Showing only what goes into <b id="treefocusname"></b>. <button class="resetbtn plain" id="treefocusoff">Show the whole tree</button></div>
           <div class="flow" id="ingr"></div>
+          <div class="treetip" id="treetip" hidden></div>
           <p class="fitsub">Put any ingredient on the bus, or keep it off, to see what it does to the size, the machines and what the bus has to carry. The choice applies to every module that uses that ingredient. Anything under an off-the-bus ingredient disappears from this module, because another module makes it.</p>
         </div>
         <div class="tablebox"><table>
@@ -884,61 +921,155 @@ function chain(root,cs){ const depth={}, into={}, kids={};
 // Byproduct arrows, drawn once the boxes are in place: a dashed line from the box of the machine a byproduct comes
 // out of to the box that uses it. It leaves the top or bottom of one box and enters the top or bottom of the other,
 // running behind any box in between; when both are in the same row it loops underneath.
-let byArrows=[], treeZoom=1, treeX=0, treeY=0, treeRoot=null, treeFresh=true;
+let byArrows=[], treeZoom=1, treeX=0, treeY=0, treeRoot=null, treeFresh=true, treeFocus=null;
+const EYE='<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>';
+// "Show only this": the eye on a box cuts the tree down to that box and everything that goes into it. A byproduct that
+// comes in from a part of the module that is no longer shown is kept, as a box of its own saying where it comes from.
+// The whole tree is always built first, so the amounts and the byproduct sharing are exactly the same as in the full view.
+function applyFocus(){ const bar=$("treefocus"), zw=$("ingr").firstElementChild; if(!treeFocus||!zw||!zw.querySelectorAll){ bar.hidden=true; return; }
+  const all=Array.from(zw.querySelectorAll(".node")), nd=all.find(e=>e.dataset.id===String(treeFocus.id)&&e.dataset.n===treeFocus.n);
+  if(!nd){ treeFocus=null; bar.hidden=true; return; }
+  const F=nd.parentElement, inside=new Set(Array.from(F.querySelectorAll(".node")).map(e=>e.dataset.id)), keep=[], extra=[];
+  for(const a of byArrows){ if(!inside.has(String(a.to))) continue; const pe=a.self?null:all.find(e=>e.dataset.n===a.from);
+    if(a.self||(pe&&inside.has(pe.dataset.id))) keep.push(a); else extra.push(a); }
+  const top=F.cloneNode(true); top.className="branch";
+  zw.innerHTML=top.outerHTML+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg>';
+  const mk=c=>{ const d=document.createElement("div"); d.className=c; return d; };
+  extra.forEach((a,i)=>{ const cons=Array.from(zw.querySelectorAll(".node")).find(e=>e.dataset.id===String(a.to)); if(!cons) return; const br=cons.parentElement;
+    let ks=Array.from(br.children).find(c=>c.classList.contains("kids"));
+    if(!ks){ ks=mk("kids"); const st=mk("stub"), tr=mk("tri"); br.insertBefore(tr,cons); br.insertBefore(st,tr); br.insertBefore(ks,st); br.classList.remove("tail"); }
+    const leaf=mk("branch"); leaf.innerHTML='<div class="node pipe" data-id="x'+i+'" data-n="'+esc(a.item)+'"><div><b>'+esc(a.item)+'</b> <span class="amt">'+fmt(a.amt)+'/min</span></div><div><span class="src pipe">Byproduct</span> <small class="mut">comes out of the '+esc(R[a.from].machine)+' making '+esc(a.from)+', in a part of this module that isn\'t shown</small></div></div>';
+    ks.appendChild(leaf); });
+  byArrows=keep; $("treefocusname").textContent=treeFocus.n; bar.hidden=false; }
+$("ingr").addEventListener("click",e=>{ const b=e.target.closest&&e.target.closest(".eye"); if(!b) return; treeFocus={id:b.dataset.eye,n:b.dataset.n}; treeFresh=true; $("treetip").hidden=true; renderMod(); });
+$("treefocusoff").onclick=()=>{ treeFocus=null; treeFresh=true; renderMod(); };
 // The tree sits in a window you can move around in, like a map. Ctrl + scroll zooms in or out on the spot under the
 // mouse, dragging slides it, and plain scrolling still scrolls the page. Opening another module starts it at full size.
 const treeTf=()=>"translate("+treeX+"px,"+treeY+"px) scale("+treeZoom+")";
+// The tree window works like a map or a diagram viewer. It is as tall as the tree until that would be taller than the
+// window, then it stops growing and you move around inside it. The tree can never be dragged out of its window.
 function placeTree(reset){ const flow=$("ingr"), zw=flow.firstElementChild; if(!zw) return; const W0=zw.offsetWidth, H0=zw.offsetHeight;
-  if(reset){ treeZoom=1; treeX=Math.max(0,Math.round((flow.clientWidth-W0)/2)); }
-  // the window is always as tall as the tree at its current zoom, so nothing is ever cut off top or bottom
-  treeY=0; flow.style.height=Math.ceil(H0*treeZoom)+"px";
-  const cw=flow.clientWidth, z=treeZoom;
-  treeX=Math.round(Math.min(cw-80,Math.max(80-W0*z,treeX)));
+  if(reset){ treeZoom=1; treeX=Math.round((flow.clientWidth-W0)/2); treeY=0; }
+  const z=treeZoom, cap=Math.max(240,Math.round((window.innerHeight||800)*0.85));
+  flow.style.height=Math.min(Math.ceil(H0*z),cap)+"px";
+  const cw=flow.clientWidth, ch=flow.clientHeight, w=W0*z, h=H0*z;
+  const clamp=(v,size,room)=>size<=room?Math.min(room-size,Math.max(0,v)):Math.min(0,Math.max(room-size,v));
+  treeX=Math.round(clamp(treeX,w,cw)); treeY=Math.round(clamp(treeY,h,ch));
   zw.style.transform=treeTf(); }
+// Ctrl + scroll zooms on the spot under the mouse. If the window itself changes height, the page scrolls to keep that spot still.
 $("ingr").addEventListener("wheel",e=>{ if(!e.ctrlKey) return; e.preventDefault(); const flow=$("ingr"); if(!flow.firstElementChild) return;
   const old=treeZoom, z=Math.min(2.5,Math.max(0.1,old*(e.deltaY<0?1.12:1/1.12))); if(z===old) return;
-  const r=flow.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
-  treeX=mx-(mx-treeX)*z/old; treeZoom=z; placeTree(false);
-  // the window grew or shrank from its top edge, so scroll the page by the same amount to keep that spot under the mouse
-  window.scrollBy&&window.scrollBy(0,my*(z/old-1)); },{passive:false});
-{ let drag=null; const flow=$("ingr");
-  flow.addEventListener("pointerdown",e=>{ if(e.button!==0||e.target.closest("button")) return; drag={x:e.clientX,y:e.clientY,tx:treeX,ty:treeY}; flow.classList.add("drag"); flow.setPointerCapture&&flow.setPointerCapture(e.pointerId); });
-  flow.addEventListener("pointermove",e=>{ if(!drag) return; treeX=drag.tx+e.clientX-drag.x; placeTree(false); });
-  const stop=()=>{ drag=null; flow.classList.remove("drag"); }; flow.addEventListener("pointerup",stop); flow.addEventListener("pointercancel",stop); }
+  const r=flow.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top, oy=treeY;
+  treeX=mx-(mx-treeX)*z/old; treeY=my-(my-treeY)*z/old; treeZoom=z; placeTree(false);
+  const drift=treeY+(my-oy)*z/old-my; if(Math.abs(drift)>0.5&&window.scrollBy) window.scrollBy(0,drift); },{passive:false});
+// Dragging moves the tree in any direction. Once it can't move any further up or down, the drag scrolls the page instead.
+{ let drag=false; const flow=$("ingr");
+  flow.addEventListener("pointerdown",e=>{ if(e.button!==0||e.target.closest("button")) return; drag=true; flow.classList.add("drag"); flow.setPointerCapture&&flow.setPointerCapture(e.pointerId); });
+  flow.addEventListener("pointermove",e=>{ if(!drag) return; treeX+=e.movementX; const want=treeY+e.movementY; treeY=want; placeTree(false);
+    const left=want-treeY; if(Math.abs(left)>0.5&&window.scrollBy) window.scrollBy(0,-left); });
+  const stop=()=>{ drag=false; flow.classList.remove("drag"); }; flow.addEventListener("pointerup",stop); flow.addEventListener("pointercancel",stop); }
+$("treereset").onclick=()=>{ treeFresh=true; layoutTree(); };
+// Lines you can point at. Hovering a line lights up the line and the boxes it joins: for a solid line, the item and
+// everything that goes straight into it; for a dashed line, the machine the byproduct comes out of and the item it goes
+// into. Clicking a line opens a small card listing just those things. Dragging still moves the tree.
+{ const flow=$("ingr"), tip=$("treetip"); let cur="", down=null;
+  const nodeOf=b=>Array.from(b.children).find(c=>c.classList.contains("node"));
+  const kidsOf=b=>Array.from(b.children).find(c=>c.classList.contains("kids"));
+  const clear=()=>{ for(const e of flow.querySelectorAll(".hl")) e.classList.remove("hl"); flow.classList.remove("online"); };
+  // which line is under the mouse: {kind:"feed",branch} (branch = the item being fed), {kind:"by",i}, or null
+  const hit=e=>{ const t=e.target; if(!t||!t.closest||!t.classList) return null;
+    if(t.classList.contains("hit")) return {kind:"by",i:+t.dataset.i};
+    if(t.classList.contains("stub")||t.classList.contains("tri")) return {kind:"feed",branch:t.parentElement};
+    if(t.classList.contains("branch")&&t.parentElement.classList.contains("kids")){ const r=t.getBoundingClientRect(), nd=nodeOf(t), nr=nd?nd.getBoundingClientRect().right:r.left;
+      const y=r.top+(parseFloat(t.style.getPropertyValue("--a"))||0)*treeZoom;
+      if((Math.abs(e.clientY-y)<=7&&e.clientX>=nr-1)||e.clientX>=r.right-8*treeZoom) return {kind:"feed",branch:t.parentElement.parentElement}; }
+    return null; };
+  const keyOf=h=>!h?"":h.kind==="by"?"by"+h.i:"feed"+nodeOf(h.branch).dataset.id;
+  const byEnds=a=>{ const nodes=Array.from(flow.querySelectorAll(".node")), te=nodes.find(e=>e.dataset.id===String(a.to)); return {te,pe:a.self?te:nodes.find(e=>e.dataset.n===a.from)}; };
+  const mark=h=>{ clear(); if(!h) return; flow.classList.add("online");
+    if(h.kind==="feed"){ h.branch.classList.add("hl"); return; }
+    const a=byArrows[h.i]; if(!a) return; const {te,pe}=byEnds(a); if(te) te.classList.add("hl"); if(pe) pe.classList.add("hl");
+    for(const e of flow.querySelectorAll('[data-i="'+h.i+'"]')) e.classList.add("hl"); };
+  flow.addEventListener("mousemove",e=>{ if(flow.classList.contains("drag")&&down&&down.moved) return; const h=hit(e), k=keyOf(h); if(k!==cur){ cur=k; mark(h); } });
+  flow.addEventListener("mouseleave",()=>{ cur=""; clear(); });
+  // the card
+  // a name in the card is a button: pressing it moves the tree to put that box in the middle of the window and lights it up
+  const go=(name,nd)=>nd?'<button class="link goto" data-goto="'+esc(nd.dataset.id)+'">'+esc(name)+'</button>':'<b>'+esc(name)+'</b>';
+  const focus=id=>{ const nd=Array.from(flow.querySelectorAll(".node")).find(e=>e.dataset.id===String(id)); if(!nd) return;
+    const fr=flow.getBoundingClientRect(), r=nd.getBoundingClientRect();
+    treeX+=fr.left+fr.width/2-(r.left+r.width/2); treeY+=fr.top+fr.height/2-(r.top+r.height/2); placeTree(false);
+    if(nd.scrollIntoView) nd.scrollIntoView({block:"center",inline:"nearest",behavior:"smooth"});
+    clear(); nd.classList.add("hl"); cur="focus"; };
+  const li=(name,amt,note,nd)=>'<li>'+go(name,nd)+' <span class="amt">'+esc(amt)+'</span>'+(note?'<div class="mut">'+esc(note)+'</div>':"")+'</li>';
+  const card=h=>{ if(h.kind==="by"){ const a=byArrows[h.i]; if(!a) return ""; const {te,pe}=byEnds(a), user=te?te.dataset.n:"";
+      return '<h4>'+esc(a.item)+' <span class="amt">'+fmt(a.amt)+'/min</span></h4><p class="mut">A byproduct.</p>'
+        +'<p>It comes out of the <b>'+esc(R[a.from].machine)+'</b> making '+go(a.from,pe)+'.</p>'
+        +'<p>It goes into the <b>'+esc(R[user]?R[user].machine:"machine")+'</b> making '+go(user,te)+(a.self?', which is the same machine it came out of':'')+'.</p>'
+        +'<p class="mut">Nothing is made or bought for this share of the '+esc(a.item)+'.</p>'; }
+    const cons=nodeOf(h.branch), ks=kidsOf(h.branch); if(!cons) return "";
+    let rows=""; if(ks) for(const b of ks.children){ const nd=nodeOf(b); if(nd) rows+=li(nd.dataset.n,(nd.querySelector(".amt")||{}).textContent||"",(nd.querySelector(".src")||{}).textContent||"",nd); }
+    for(const a of byArrows) if(String(a.to)===cons.dataset.id) rows+=li(a.item,fmt(a.amt)+"/min","Byproduct of the "+R[a.from].machine+" making "+a.from+(a.self?" (this same machine)":"")+". Press the name to go to where it comes out.",byEnds(a).pe);
+    return '<h4>What goes straight into '+go(cons.dataset.n,cons)+' <span class="amt">'+esc((cons.querySelector(".amt")||{}).textContent||"")+'</span></h4><ul>'+rows+'</ul>'; };
+  const hide=()=>{ tip.hidden=true; };
+  const show=(h,e)=>{ const html=card(h); if(!html){ hide(); return; } tip.innerHTML='<button class="x" id="tipx" aria-label="Close">&times;</button>'+html; tip.hidden=false;
+    const host=tip.parentElement.getBoundingClientRect(), w=tip.offsetWidth||300;
+    tip.style.left=Math.round(Math.max(8,Math.min(host.width-w-8,e.clientX-host.left+12)))+"px"; tip.style.top=Math.round(e.clientY-host.top+12)+"px"; };
+  // a click is a press and release without moving; anything more is a drag
+  flow.addEventListener("pointerdown",e=>{ down={x:e.clientX,y:e.clientY,h:hit(e),moved:false}; });
+  flow.addEventListener("pointermove",e=>{ if(down&&Math.abs(e.clientX-down.x)+Math.abs(e.clientY-down.y)>5) down.moved=true; });
+  flow.addEventListener("pointerup",e=>{ const d=down; down=null; if(!d||d.moved) return; if(d.h) show(d.h,e); else hide(); });
+  tip.addEventListener("click",e=>{ if(!e.target.closest) return; if(e.target.closest("#tipx")){ hide(); return; } const g=e.target.closest(".goto"); if(g) focus(g.dataset.goto); });
+  if(document.addEventListener) document.addEventListener("keydown",e=>{ if(e.key==="Escape") hide(); }); }
 function drawBy(){ const flow=$("ingr"), svg=flow.querySelector("svg.bylines"), txt=flow.querySelector("svg.bytext"); if(!svg||!txt) return;
   const zw=flow.firstElementChild, Z=treeZoom, fr=zw.getBoundingClientRect(), tr=zw.firstElementChild.getBoundingClientRect(), W=Math.ceil(tr.width/Z)+8, H=Math.ceil(tr.height/Z)+40;
   for(const s of [svg,txt]){ s.setAttribute("width",W); s.setAttribute("height",H); s.setAttribute("viewBox","0 0 "+W+" "+H); }
   const nodes=Array.from(flow.querySelectorAll(".node")); const box=e=>{ const r=e.getBoundingClientRect(); return {l:(r.left-fr.left)/Z,t:(r.top-fr.top)/Z,w:r.width/Z,h:r.height/Z}; };
   let lines='<defs><marker id="byhead" markerWidth="10" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L10 6L0 12Z" fill="currentColor"/></marker></defs>', labels="";
-  const used={};
-  for(const a of byArrows){ const pe=nodes.find(e=>e.dataset.n===a.from), te=nodes.find(e=>e.dataset.id===String(a.to)); if(!pe||!te) continue; const p=box(pe), t=box(te);
-    const k=used[a.from]=(used[a.from]||0)+1, ol=Math.max(p.l,t.l), or=Math.min(p.l+p.w,t.l+t.w); let d, lx, ly;
-    if(pe!==te&&or-ol>=30){
+  const used={}, usedIn={}, hs=[], vs=[];
+  // every stretch of line is checked against the ones already drawn and nudged aside until it has a lane to itself
+  const freeY=(y,x1,x2,step)=>{ const lo=Math.min(x1,x2), hi=Math.max(x1,x2); for(let g=0;g<16&&hs.some(q=>Math.abs(q.y-y)<9&&q.lo<hi&&q.hi>lo);g++) y+=step; hs.push({y,lo,hi}); return y; };
+  const freeX=(x,y1,y2,step)=>{ const lo=Math.min(y1,y2), hi=Math.max(y1,y2); for(let g=0;g<16&&vs.some(q=>Math.abs(q.x-x)<9&&q.lo<hi&&q.hi>lo);g++) x+=step; vs.push({x,lo,hi}); return x; };
+  for(const a of byArrows){ const te=nodes.find(e=>e.dataset.id===String(a.to)), pe=a.self?te:nodes.find(e=>e.dataset.n===a.from); if(!pe||!te) continue; const p=box(pe), t=box(te);
+    const kt=usedIn[a.to]=(usedIn[a.to]||0)+1, k=used[a.from]=(used[a.from]||0)+1, ol=Math.max(p.l,t.l), or=Math.min(p.l+p.w,t.l+t.w); let d, lx, ly;
+    const above=t.t+t.h<=p.t-14, below=t.t>=p.t+p.h+14, pcx=Math.round(p.l+p.w/2+10*(k-1)), tcx=Math.round(t.l+t.w/2-10*(kt-1));
+    if(pe!==te&&(above||below)&&or-ol>=30){
       // one box sits over the other: straight up or straight down, label halfway along
-      const x=Math.round((ol+or)/2), up=t.t<p.t, y0=Math.round(up?p.t:p.t+p.h), y1=Math.round(up?t.t+t.h+1:t.t-1);
+      const y0=Math.round(above?p.t:p.t+p.h), y1=Math.round(above?t.t+t.h+1:t.t-1), x=freeX(Math.round((ol+or)/2),y0,y1,10);
       d="M"+x+" "+y0+"V"+y1; lx=x; ly=Math.round((y0+y1)/2)+4; }
+    else if(pe!==te&&(above||below)){
+      // a row above or below: out of the bottom (or top), across in the gap beside the box that uses it, into its top (or bottom)
+      const y0=Math.round(above?p.t:p.t+p.h), y1=Math.round(above?t.t+t.h+1:t.t-1);
+      const lane=freeY(Math.round(above?t.t+t.h+18:t.t-18),pcx,tcx,above?10:-10), px=freeX(pcx,y0,lane,10), tx=freeX(tcx,lane,y1,-10);
+      d="M"+px+" "+y0+"V"+lane+"H"+tx+"V"+y1; lx=Math.round((px+tx)/2); ly=lane+4; }
     else {
-      // otherwise: out of the right side of the machine it comes from, along the gap between rows, and into the left
-      // side of what uses it. It leaves and arrives above or below the main line, never on top of it.
-      const above=t.t+t.h<=p.t-14, below=t.t>=p.t+p.h+14;
-      // when both are in the same row the line goes over the top, clear of every box it passes on the way
-      let over=Math.min(p.t,t.t); if(!above&&!below){ const xl=Math.min(p.l,t.l), xr=Math.max(p.l+p.w,t.l+t.w), yb=Math.max(p.t+p.h,t.t+t.h);
-        for(const e of nodes){ const b=box(e); if(b.l<xr&&b.l+b.w>xl&&b.t<yb&&b.t+b.h>over-30) over=Math.min(over,b.t); } }
-      const lane=Math.round(above?t.t+t.h+7:(below?t.t-7:over-7));
-      const py=Math.round(lane<p.t+p.h/2?p.t+p.h*0.25:p.t+p.h*0.75), ty=Math.round(lane<t.t+t.h/2?t.t+t.h*0.25:t.t+t.h*0.75);
-      const x0=Math.round(p.l+p.w), xa=x0+10+6*(k-1), xb=Math.round(t.l)-14, x1=Math.round(t.l)-1;
-      d="M"+x0+" "+py+"H"+xa+"V"+lane+"H"+xb+"V"+ty+"H"+x1; lx=Math.round((xa+xb)/2); ly=lane+4; }
-    lines+='<path d="'+d+'" marker-end="url(#byhead)"/>';
-    labels+='<text x="'+lx+'" y="'+ly+'" text-anchor="middle">'+esc(a.item)+' '+fmt(a.amt)+'/min</text>'; }
+      // the same row: the line goes over the top, clear of every box it passes
+      let over=Math.min(p.t,t.t); { const xl=Math.min(p.l,t.l), xr=Math.max(p.l+p.w,t.l+t.w), yb=Math.max(p.t+p.h,t.t+t.h);
+        for(const e of nodes){ const bb=box(e); if(bb.l<xr&&bb.l+bb.w>xl&&bb.t<yb&&bb.t+bb.h>over-30) over=Math.min(over,bb.t); } }
+      if(pe!==te){
+        // two different boxes: up out of the top, across, down into the top
+        const lane=freeY(Math.round(over-18),pcx,tcx,-10), px=freeX(pcx,lane,p.t,10), tx=freeX(tcx,lane,t.t,-10);
+        d="M"+px+" "+Math.round(p.t)+"V"+lane+"H"+tx+"V"+Math.round(t.t-1); lx=Math.round((px+tx)/2); ly=lane+4; }
+      else {
+        // a box feeding itself: out of its right side, over its top, and into its own front, above the main line
+        const x0=Math.round(p.l+p.w), x1=Math.round(p.l)-1, side=Math.round(p.t+p.h*0.3);
+        const lane=freeY(Math.round(p.t-12),x1-14,x0+10,-10), xa=freeX(x0+10,lane,side,7), xb=Math.max(3,freeX(x1-13,lane,side,-7));
+        d="M"+x0+" "+side+"H"+xa+"V"+lane+"H"+xb+"V"+side+"H"+x1; lx=Math.round((xa+xb)/2); ly=lane+4; } }
+    const bi=byArrows.indexOf(a);
+    lines+='<path class="vis" data-i="'+bi+'" d="'+d+'" marker-end="url(#byhead)"/><path class="hit" data-i="'+bi+'" d="'+d+'"/>';
+    labels+='<text data-i="'+bi+'" x="'+lx+'" y="'+ly+'" text-anchor="middle">'+esc(a.item)+' '+fmt(a.amt)+'/min</text>'; }
   svg.innerHTML=lines; txt.innerHTML=labels; }
 function layoutTree(){ const zw=$("ingr").firstElementChild, top=zw&&zw.firstElementChild; if(!top||!top.getBoundingClientRect||$("pane-mods").hidden) return;
   if(treeFresh){ treeZoom=1; treeX=0; treeY=0; zw.style.transform="none"; } const Z=treeZoom;
   for(const e of $("ingr").querySelectorAll(".node,.stub,.tri,.kids")){ e.style.marginTop=""; e.style.marginLeft=""; }
   { const nodes=Array.from($("ingr").querySelectorAll(".node"));
-    for(const a of byArrows){ const pe=nodes.find(e=>e.dataset.n===a.from), te=nodes.find(e=>e.dataset.id===String(a.to)); if(!pe||!te) continue;
-      const br=te.parentElement; if(!br.classList.contains("tail")) continue;
-      const dx=(pe.getBoundingClientRect().left-te.getBoundingClientRect().left)/Z, room=(br.getBoundingClientRect().width-te.getBoundingClientRect().width)/Z-22;
-      if(dx>0) te.style.marginLeft=Math.round(Math.min(dx,Math.max(0,room)))+"px"; } }
+    // A box fed only by a byproduct slides right to sit directly under or over the machine that byproduct comes out of,
+    // taking the rest of its run of boxes with it, wherever its row has the room. The arrow is then a straight line.
+    for(const a of byArrows){ if(a.self) continue; const pe=nodes.find(e=>e.dataset.n===a.from), te=nodes.find(e=>e.dataset.id===String(a.to)); if(!pe||!te) continue;
+      let br=te.parentElement; if(!br.classList.contains("tail")) continue;
+      while(br.parentElement&&br.parentElement.classList.contains("kids")&&br.parentElement.children.length===1&&br.parentElement.parentElement.classList.contains("branch")) br=br.parentElement.parentElement;
+      let used=0; for(const c of br.children) used+=c.getBoundingClientRect().width;
+      const dx=(pe.getBoundingClientRect().left-te.getBoundingClientRect().left)/Z, room=(br.getBoundingClientRect().width-used)/Z-22;
+      if(dx>0&&room>0) br.firstElementChild.style.marginLeft=Math.round(Math.min(dx,room))+"px"; } }
   const kid=(b,c)=>Array.from(b.children).filter(e=>e.classList.contains(c));
   const fix=b=>{ const node=kid(b,"node")[0], ks=kid(b,"kids")[0], bt=()=>b.getBoundingClientRect().top;
     if(!ks){ const r=node.getBoundingClientRect(); return Math.round((r.top+r.height/2-bt())/Z); }
@@ -1008,7 +1139,7 @@ function renderMod(){
 
   // --- ingredients ---
   const G=chain(root,cs), maxD=Math.max(...G.order.map(n=>G.depth[n]));
-  const nodeHtml=(n,amt,isRoot,id)=>{ const x=I[n]; if(!x) return ""; const fromBus=!isRoot&&cs.has(n);
+  const nodeHtml=(n,amt,isRoot,id,eye)=>{ const x=I[n]; if(!x) return ""; const fromBus=!isRoot&&cs.has(n);
     let src, act="", mark="", cls="made";
     if(isRoot){ src='<span class="src here">Made here</span>'; mark=' <small class="mut">the finished item</small>'; cls="root"; }
     else if(x.liq){ src='<span class="src pipe">Piped here</span>'; cls="pipe"; }
@@ -1018,21 +1149,30 @@ function renderMod(){
       if(fromBus){ src='<span class="src bus">Off the bus</span>'; cls="bus"; act=s.mine?btn("","Undo my choice"):btn("off","Keep it off the bus"); if(!s.mine&&L.forcedBy[n]&&L.forcedBy[n].includes(root)) mark=' <small class="mut">(won\'t fit otherwise)</small>'; }
       else { src='<span class="src here">Made here</span>'; act=s.mine?btn("","Undo my choice"):btn("bus","Put it on the bus"); if(s.code==="maybe") mark=' <small class="mut">(a maybe)</small>'; }
       if(s.mine) mark=' <small class="mut">(your choice)</small>'; }
-    return '<div class="node '+cls+'" data-id="'+id+'" data-n="'+esc(n)+'"><div><b>'+esc(n)+'</b> <span class="amt">'+fmt(amt)+'/min</span></div><div>'+src+mark+'</div>'+act+'</div>'; };
+    return '<div class="node '+cls+'" data-id="'+id+'" data-n="'+esc(n)+'"><div><b>'+esc(n)+'</b> <span class="amt">'+fmt(amt)+'/min</span></div><div>'+src+mark+'</div>'+act+(eye?'<button class="eye" data-eye="'+id+'" data-n="'+esc(n)+'" title="Show only what goes into '+esc(n)+'" aria-label="Show only what goes into '+esc(n)+'">'+EYE+'</button>':"")+'</div>'; };
   // a tree, read left to right: every item sits to the right of what goes into it, joined by lines, and the
   // finished item is at the far right. Something used in several places shows up in each, with the amount that place needs.
   byArrows=[]; let nid=0;
-  const tree=(n,q,d,parent)=>{ const isRoot=d===0, r=R[n], cut=!isRoot&&cs.has(n), id=++nid;
+  // A byproduct goes back into the machine it came out of before anything else (the steel Athanor's spare iron ingots feed
+  // the steel Athanor). Only what is left after that is shared out to other things that use the same item.
+  // back: of every one of the item a machine takes in, how much it gives straight back (the steel Athanor returns 3 of
+  // every 4 iron ingots). rest: what is left of the byproduct, across the whole module, for anything else that uses it.
+  const pools={}; const poolOf=(n,from)=>pools[n]||(pools[n]=(()=>{ const pr=R[from], y=C.yieldOf(pr);
+    const back=pr.ins[n]?Math.min(1,pr.outs[n]*y/pr.ins[n]):0, taken=(sol.flows[from]||0)/(pr.outs[from]*y)*(pr.ins[n]||0)*back;
+    return {back,rest:Math.max(0,sol.recycled[n]-Math.min(sol.recycled[n],taken))}; })());
+  const tree=(n,q,d,parent,pn)=>{ const isRoot=d===0, r=R[n], cut=!isRoot&&cs.has(n), id=++nid;
     let by=null; if(!isRoot&&!cut&&sol.recycled[n]>1e-9&&sol.flows[n]>1e-9){ const from=Object.keys(sol.flows).find(p=>p!==n&&R[p]&&R[p].outs[n]!=null&&I[p].kind!=="raw");
-      if(from){ const f=Math.min(1,sol.recycled[n]/sol.flows[n]); by={amt:q*f,from,full:f>0.999}; byArrows.push({from,item:n,amt:by.amt,to:by.full?parent:id}); if(by.full){ nid--; return ""; } } }
+      if(from){ const pool=poolOf(n,from), self=pn===from, take=self?q*pool.back:Math.min(q,pool.rest); if(!self) pool.rest-=take;
+        // the arrow always points at the thing that uses the byproduct; the item's own box shows only what still has to be made
+        if(take>1e-6){ by={amt:take,from,full:take>=q-1e-6}; byArrows.push({from,item:n,amt:take,to:parent,self:pn===from}); if(by.full){ nid--; return ""; } } } }
     const leaf=d>40||!r||I[n].kind==="raw"||cut||(by&&by.full), mq=by?q-by.amt:q;
     let kids="", tail=false; if(!leaf){ const crafts=mq/(r.outs[n]*C.yieldOf(r)); const ks=Object.keys(r.ins).filter(i=>I[i]).sort((x,y)=>(G.pos[x]??0)-(G.pos[y]??0));
-      const inner=ks.map(i=>tree(i,crafts*r.ins[i],d+1,id)).join("");
+      const inner=ks.map(i=>tree(i,crafts*r.ins[i],d+1,id,n)).join("");
       tail=!inner&&ks.length>0;
       if(inner) kids='<div class="kids">'+inner+'</div><div class="stub" aria-hidden="true"></div><div class="tri" aria-hidden="true"></div>'; }
-    return '<div class="branch'+(tail?' tail':'')+'">'+kids+nodeHtml(n,q,isRoot,id)+'</div>'; };
-  if(root!==treeRoot){ treeRoot=root; treeFresh=true; }
-  $("ingr").innerHTML='<div class="zw" style="transform:'+treeTf()+'">'+tree(root,rate,0,0)+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg></div>'; layoutTree();
+    return '<div class="branch'+(tail?' tail':'')+'">'+kids+nodeHtml(n,mq,isRoot,id,!!kids&&!isRoot)+'</div>'; };
+  if(root!==treeRoot){ treeRoot=root; treeFresh=true; treeFocus=null; $("treetip").hidden=true; }
+  $("ingr").innerHTML='<div class="zw" style="transform:'+treeTf()+'">'+tree(root,rate,0,0)+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg></div>'; applyFocus(); layoutTree();
 
   // --- machines ---
   $("mrows").innerHTML=sol.list.filter(m=>m.count>1e-9).sort((a,b)=>(G.pos[a.item]??999)-(G.pos[b.item]??999)).map(m=>{ const n=m.count, b=Math.ceil(n-1e-9), busy=b?n/b*100:0;
