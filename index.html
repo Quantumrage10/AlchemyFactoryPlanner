@@ -451,7 +451,7 @@ svg.bylines marker path{fill:currentColor;stroke:none;stroke-dasharray:none}
         </div>
         <div class="box">
           <div class="dhead"><h3>Every ingredient, and where it comes from</h3></div>
-          <p class="fitsub">Read it left to right. Every item sits to the right of what goes into it, and the lines show what feeds what, ending at the finished item. Something used in several places shows up in each one, with the amount that place needs. A dashed arrow is a byproduct: it runs from the machine it comes out of to the item that uses it. <b>Hold Ctrl and scroll to zoom in or out on wherever your mouse is, and drag to move around.</b></p>
+          <p class="fitsub">Read it left to right. Every item sits to the right of what goes into it, and the lines show what feeds what, ending at the finished item. Something used in several places shows up in each one, with the amount that place needs. A dashed arrow is a byproduct: it runs from the machine it comes out of to the item that uses it. <b>Hold Ctrl and scroll to zoom in or out on wherever your mouse is, and drag to slide it sideways.</b></p>
           <div class="flow" id="ingr"></div>
           <p class="fitsub">Put any ingredient on the bus, or keep it off, to see what it does to the size, the machines and what the bus has to carry. The choice applies to every module that uses that ingredient. Anything under an off-the-bus ingredient disappears from this module, because another module makes it.</p>
         </div>
@@ -841,17 +841,21 @@ let byArrows=[], treeZoom=1, treeX=0, treeY=0, treeRoot=null, treeFresh=true;
 // mouse, dragging slides it, and plain scrolling still scrolls the page. Opening another module starts it at full size.
 const treeTf=()=>"translate("+treeX+"px,"+treeY+"px) scale("+treeZoom+")";
 function placeTree(reset){ const flow=$("ingr"), zw=flow.firstElementChild; if(!zw) return; const W0=zw.offsetWidth, H0=zw.offsetHeight;
-  if(reset){ treeZoom=1; flow.style.height=Math.min(H0,Math.round((window.innerHeight||800)*0.8))+"px"; treeX=Math.max(0,Math.round((flow.clientWidth-W0)/2)); treeY=0; }
-  const cw=flow.clientWidth, ch=flow.clientHeight, z=treeZoom;
-  treeX=Math.round(Math.min(cw-80,Math.max(80-W0*z,treeX))); treeY=Math.round(Math.min(ch-60,Math.max(60-H0*z,treeY)));
+  if(reset){ treeZoom=1; treeX=Math.max(0,Math.round((flow.clientWidth-W0)/2)); }
+  // the window is always as tall as the tree at its current zoom, so nothing is ever cut off top or bottom
+  treeY=0; flow.style.height=Math.ceil(H0*treeZoom)+"px";
+  const cw=flow.clientWidth, z=treeZoom;
+  treeX=Math.round(Math.min(cw-80,Math.max(80-W0*z,treeX)));
   zw.style.transform=treeTf(); }
 $("ingr").addEventListener("wheel",e=>{ if(!e.ctrlKey) return; e.preventDefault(); const flow=$("ingr"); if(!flow.firstElementChild) return;
   const old=treeZoom, z=Math.min(2.5,Math.max(0.1,old*(e.deltaY<0?1.12:1/1.12))); if(z===old) return;
   const r=flow.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
-  treeX=mx-(mx-treeX)*z/old; treeY=my-(my-treeY)*z/old; treeZoom=z; placeTree(false); },{passive:false});
+  treeX=mx-(mx-treeX)*z/old; treeZoom=z; placeTree(false);
+  // the window grew or shrank from its top edge, so scroll the page by the same amount to keep that spot under the mouse
+  window.scrollBy&&window.scrollBy(0,my*(z/old-1)); },{passive:false});
 { let drag=null; const flow=$("ingr");
   flow.addEventListener("pointerdown",e=>{ if(e.button!==0||e.target.closest("button")) return; drag={x:e.clientX,y:e.clientY,tx:treeX,ty:treeY}; flow.classList.add("drag"); flow.setPointerCapture&&flow.setPointerCapture(e.pointerId); });
-  flow.addEventListener("pointermove",e=>{ if(!drag) return; treeX=drag.tx+e.clientX-drag.x; treeY=drag.ty+e.clientY-drag.y; placeTree(false); });
+  flow.addEventListener("pointermove",e=>{ if(!drag) return; treeX=drag.tx+e.clientX-drag.x; placeTree(false); });
   const stop=()=>{ drag=null; flow.classList.remove("drag"); }; flow.addEventListener("pointerup",stop); flow.addEventListener("pointercancel",stop); }
 function drawBy(){ const flow=$("ingr"), svg=flow.querySelector("svg.bylines"), txt=flow.querySelector("svg.bytext"); if(!svg||!txt) return;
   const zw=flow.firstElementChild, Z=treeZoom, fr=zw.getBoundingClientRect(), tr=zw.firstElementChild.getBoundingClientRect(), W=Math.ceil(tr.width/Z)+8, H=Math.ceil(tr.height/Z)+40;
