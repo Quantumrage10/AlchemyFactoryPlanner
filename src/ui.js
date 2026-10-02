@@ -4,7 +4,10 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function fmt(x){ if(!isFinite(x)) return "—"; if(Math.abs(x)<1e-9) return "0"; const a=Math.abs(x); if(a>=1000) return Math.round(x).toLocaleString(); if(a>=100) return x.toFixed(0); if(a>=10) return (+x.toFixed(1)).toString(); if(a>=0.1) return (+x.toFixed(2)).toString(); return (+x.toPrecision(2)).toString(); }
 // Money, given in copper, shown in the coin you would actually use: 1,000 copper is 1 silver and 100 silver is 1 gold.
-const money=c=>c<1000?fmt(c)+" copper":c<100000?fmt(c/1000)+" silver":fmt(c/100000)+" gold";
+const coinOf=c=>c<1000?["copper",c]:c<100000?["silver",c/1000]:["gold",c/100000];
+const money=c=>{ const [u,v]=coinOf(c); return fmt(v)+" "+u; };
+// the same amount with a little drawn coin beside it (word=true also spells the coin out); hovering shows it in full
+const coinHtml=(c,word)=>{ const [u,v]=coinOf(c); return '<span class="money" title="'+money(c)+(c>=1000?" ("+Math.round(c).toLocaleString()+" copper)":"")+'">'+fmt(v)+' <i class="coin c-'+u+'"></i>'+(word?" "+u:"")+"</span>"; };
 const plural=(n,w)=>n+" "+(n===1?w:(/y$/.test(w)?w.slice(0,-1)+"ies":(/s$/.test(w)?w:w+"s")));
 const listAnd=a=>a.length<=1?a.join(""):a.length===2?a.join(" and "):a.slice(0,-1).join(", ")+" and "+a[a.length-1];
 $("ver").textContent="game "+DATA.version;
@@ -140,7 +143,7 @@ function renderItems(){
     const name=r.made?`<button class="link" data-mod="${esc(r.n)}">${esc(r.n)}</button>`:`<span class="name">${esc(r.n)}</span>`;
     const used=[...r.users.map(u=>`<span class="chip">${esc(u)}</span>`), r.it.heat>0?`<span class="chip furnc">Furnaces</span>`:"", (r.it.nutr>0&&r.it.fspeed>0)?`<span class="chip nursc">Nurseries</span>`:"", r.it.relic?`<span class="chip resc">Research</span>`:"", r.it.sell?`<span class="chip shopc">Shop</span>`:""].join("")||"—";
     const act=r.made?picker(r.n,r.st):"";
-    return `<tr><td class="nmc">${name}</td><td class="stc"><span class="st ${r.st.code}">${esc(label(r.st))}</span>${r.st.mine?'<div class="mine">your choice</div>':""}</td><td class="why">${esc(r.st.why)}</td><td class="act">${act}</td><td class="usedc"><div class="chips">${used}</div></td><td class="num"${r.it.sell?` title="${price(r.n).toLocaleString()}"`:""}>${r.it.sell?short(price(r.n)):""}</td><td class="num">${r.it.tier}</td></tr>`; }).join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
+    return `<tr><td class="nmc">${name}</td><td class="stc"><span class="st ${r.st.code}">${esc(label(r.st))}</span>${r.st.mine?'<div class="mine">your choice</div>':""}</td><td class="why">${esc(r.st.why)}</td><td class="act">${act}</td><td class="usedc"><div class="chips">${used}</div></td><td class="num">${r.it.sell?coinHtml(price(r.n)):""}</td><td class="num">${r.it.tier}</td></tr>`; }).join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
 }
 $("q").oninput=renderItems;
 $("rows").addEventListener("click",e=>{ const s=e.target.closest(".swap"); if(s){ decide(s.dataset.item,s.dataset.to||null); return; } const b=e.target.closest("[data-mod]"); if(b) openMod(b.dataset.mod); });
@@ -600,7 +603,7 @@ function renderMod(){
   $("mname").textContent=root;
   const it=I[root], st=status(root); const users=it.uses.filter(inTier);
   const ends=[...users, it.relic?"research":"", it.sell?"the shop":""].filter(Boolean);
-  $("mmeta").innerHTML=`Tech tier ${it.tier}`+(it.sell?` · sells for ${price(root).toLocaleString()}`:"")+(ends.length?` · goes to ${esc(listAnd(ends))}`:" · nothing at this tier uses it")+` · on the bus: <b class="${st.code==="no"?"":"cu"}">${esc(label(st).toLowerCase())}</b>`;
+  $("mmeta").innerHTML=`Tech tier ${it.tier}`+(it.sell?` · sells for ${coinHtml(price(root),true)}`:"")+(ends.length?` · goes to ${esc(listAnd(ends))}`:" · nothing at this tier uses it")+` · on the bus: <b class="${st.code==="no"?"":"cu"}">${esc(label(st).toLowerCase())}</b>`;
 
   // --- fit ---
   const evTxt=c=>c.odd?plural(c.odd,"machine count")+" uneven":(c.half?"All whole, except "+(c.half===1?"one machine":c.half+" machines")+" at half":"All machine counts whole");
@@ -631,10 +634,10 @@ function renderMod(){
   if(sol.fert>1e-9&&!selfFert) bus+=rowKV(esc(FERTN),fmt(sol.fert)+"/min","for the nurseries");
   const busTotal=busItems.reduce((a,[,v])=>a+v,0)+((selfFuel||fuelRaw)?0:fuel)+(selfFert?0:sol.fert);
   $("busin").innerHTML=(bus||`<div class="empty">Nothing. Runs on coins alone.</div>`)+(bus?`<div class="row tot"><span>Total off the bus</span><span>${fmt(busTotal)}/min</span></div>`:"");
-  let coins=""; for(const [k,v] of Object.entries(sol.coins).sort((a,b)=>b[1]*I[b[0]].buy-a[1]*I[a[0]].buy)) coins+=rowKV(esc(k),fmt(v)+"/min",money(v*I[k].buy)+"/min");
+  let coins=""; for(const [k,v] of Object.entries(sol.coins).sort((a,b)=>b[1]*I[b[0]].buy-a[1]*I[a[0]].buy)) coins+=rowKV(esc(k),fmt(v)+"/min",coinHtml(v*I[k].buy,true)+"/min");
   const fuelCopper=(fuelRaw&&fuel>1e-9)?fuel*I[FUELN].buy:0;
-  if(fuelCopper>0) coins+=rowKV(esc(FUELN)+" (fuel)",fmt(fuel)+"/min",money(fuelCopper)+"/min");
-  $("coins").innerHTML=(coins||`<div class="empty">No coins needed.</div>`)+(coins?`<div class="row tot"><span>Total coins</span><span>${money(sol.copper+fuelCopper)}/min</span></div>`:"");
+  if(fuelCopper>0) coins+=rowKV(esc(FUELN)+" (fuel)",fmt(fuel)+"/min",coinHtml(fuelCopper,true)+"/min");
+  $("coins").innerHTML=(coins||`<div class="empty">No coins needed.</div>`)+(coins?`<div class="row tot"><span>Total coins</span><span>${coinHtml(sol.copper+fuelCopper,true)}/min</span></div>`:"");
   $("fuelnote").textContent="Fuel: "+FUELN+", "+I[FUELN].heat.toLocaleString()+" heat each. Fertilizer: "+FERTN+".";
   let outp=rowKV(esc(root)+" made",fmt(rate)+"/min");
   if(selfFuel&&fuel>1e-9){ outp+=rowKV("Burned as its own fuel","−"+fmt(fuel)+"/min"); outp+=`<div class="row tot"><span>Leaves the module</span><span>${fmt(rate-fuel)}/min</span></div>`; }

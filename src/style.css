@@ -401,3 +401,17 @@ svg.bylines>path.vis.hl{stroke-width:calc(var(--lw,2px)*1.75)}
 /* the dot where a byproduct line joins a shared line */
 svg.bylines>circle.vis{fill:currentColor;stroke:none}
 svg.bylines>circle.vis.hl{color:var(--copper)}
+/* a drawn coin: a disc with a darker rim and a small shine, in copper, silver or gold */
+.coin{display:inline-block;width:.86em;height:.86em;border-radius:50%;vertical-align:-.08em;background:radial-gradient(circle at 34% 30%,rgba(255,255,255,.75) 0,rgba(255,255,255,.75) 16%,rgba(255,255,255,0) 17%),var(--coin);box-shadow:inset 0 0 0 .11em var(--rim)}
+.coin.c-copper{--coin:#C9793C;--rim:#8A4B1F}
+.coin.c-silver{--coin:#C6CCD4;--rim:#7F8792}
+.coin.c-gold{--coin:#E9C046;--rim:#A27C12}
+.money{white-space:nowrap}
+/* coins, brighter and metallic: a diagonal sweep from a hot highlight through the metal's colour into shadow and back,
+   a bright glint, a dark rim and a thin light edge inside it */
+.coin{width:.95em;height:.95em;vertical-align:-.12em;
+  background:radial-gradient(circle at 32% 26%,rgba(255,255,255,.95) 0,rgba(255,255,255,.95) 11%,rgba(255,255,255,0) 26%),linear-gradient(135deg,var(--hi) 0%,var(--coin) 38%,var(--lo) 68%,var(--coin) 100%);
+  box-shadow:inset 0 0 0 .09em var(--rim),inset 0 0 0 .16em rgba(255,255,255,.35)}
+.coin.c-copper{--hi:#FFC49A;--coin:#EC7A2C;--lo:#A2420E;--rim:#6E2C08}
+.coin.c-silver{--hi:#FFFFFF;--coin:#DCE4EE;--lo:#8D9AAC;--rim:#5E6978}
+.coin.c-gold{--hi:#FFF2A8;--coin:#FFC61A;--lo:#D08A00;--rim:#8A5A00}
