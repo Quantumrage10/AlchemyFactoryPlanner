@@ -66,6 +66,7 @@ doc.getElementById('lvlfert').value = '0'; doc.getElementById('lvlfert').oninput
 // sales ability: one level is +25%, so brick's 70 becomes 87.5
 doc.getElementById('lvlsell').value = '1'; doc.getElementById('lvlsell').oninput();
 must(/87\.5/.test(strip(els.rows.innerHTML)), 'sales ability did not raise prices by 25%');
+must(els.rows.innerHTML.includes('>37.5k<') && els.rows.innerHTML.includes('title="37,500"'), 'big prices should show in short form with the full number on hover');
 doc.getElementById('lvlsell').value = '0'; doc.getElementById('lvlsell').oninput();
 // a different fuel: blast potion is far hotter than coke powder, so a glass module needs far less of it
 api.openMod('Glass');

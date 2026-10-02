@@ -198,6 +198,23 @@ table.items td.act .swap{display:block;margin-top:4px}
 .addrow input.addto.bad{border-color:var(--copper)}
 .addrow .addbtn{font:inherit;font-size:13px;font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:3px 10px;color:var(--ink);cursor:pointer}
 .addrow .addbtn:hover{border-color:var(--verd);color:var(--verd)}
+/* the bus table always fits its box: fixed column shares, names and labels wrap */
+#pane-items table.items{table-layout:fixed;min-width:860px}
+#pane-items table.items th,#pane-items table.items td{padding:9px 8px}
+#pane-items table.items th:nth-child(1){width:13%}
+#pane-items table.items th:nth-child(2){width:15%}
+#pane-items table.items th:nth-child(4){width:13%}
+#pane-items table.items th:nth-child(5){width:17%}
+#pane-items table.items th:nth-child(6){width:7%}
+#pane-items table.items th:nth-child(7){width:5%}
+#pane-items table.items td.nmc,#pane-items table.items td.stc,#pane-items table.items td.act{white-space:normal;width:auto}
+#pane-items table.items td.nmc{overflow-wrap:anywhere}
+#pane-items table.items td.nmc .link{text-align:left;white-space:normal}
+#pane-items table.items td.why,#pane-items table.items td.usedc{min-width:0;max-width:none;width:auto}
+#pane-items table.items .st{white-space:normal}
+#pane-items table.items .chip{white-space:normal}
+#pane-items select.pick{width:100%;box-sizing:border-box}
+#pane-items tr.itemhead th{white-space:normal}
 </style>
 </head>
 <body>
@@ -530,6 +547,8 @@ function applyUpgrades(){ const v=id=>+$(id).value||0; C.setSupplies($("fuelsel"
   const pct=x=>Math.round(x*100)+"%";
   $("upnote").textContent="Belts carry "+fmt(u.belt)+"/min. Machines run at "+pct(u.speed)+" speed. Extractors and alembics yield "+pct(u.alch)+". Fertilizer feeds "+pct(u.fert)+" as much. Shop prices are "+pct(u.sell)+".";
   $("connnote").textContent="each carries "+fmt(2*u.belt)+"/min (two belts)"; return u; }
+// big prices in short form for the table: 30k, 1.12M, 178M
+function short(x){ if(x<10000) return x.toLocaleString(); const U=[[1e9,"B"],[1e6,"M"],[1e3,"k"]]; for(let i=0;i<U.length;i++){ const [u,s]=U[i]; if(x>=u){ const v=+(x/u).toPrecision(3); if(v>=1000&&i>0) return +(x/U[i-1][0]).toPrecision(3)+U[i-1][1]; return v+s; } } return String(x); }
 const price=n=>Math.round((I[n].sell||0)*C.sellMult()*10)/10;
 function line(){ const k=tierMax()+"|"+cap()+"|"+C.belt()+"|"+C.speed()+"|"+C.yieldOf({machine:"Extractor"})+"|"+C.fertValue()+"|"+C.fuel()+"|"+C.fert(); if(k!==lineKey){ LINE=C.busLine(tierMax(),cap()); lineKey=k; } return LINE; }
 // Which shared wagon type an item would ride: anything that burns the fuel wagon, anything that feeds nurseries
@@ -585,7 +604,7 @@ tog("f-ded","ded"); tog("f-mix","mix"); tog("f-maybe","maybe"); tog("f-no","no")
 let sortK="bus", sortDir=1;
 // the picker: where this item goes. Every made item can be off the bus, a maybe, on its own wagons, or on any shared wagon.
 function picker(n,st){ const cur=valueOf(st);
-  const opts=[["off","Off the bus"],["maybe","Maybe"],["own","On the bus · own wagons"]].concat(plan.tags.map(t=>["tag:"+t.id,"On the bus · "+t.name+" wagon"]));
+  const opts=[["off","Off the bus"],["maybe","Maybe"],["own","Own wagons"]].concat(plan.tags.map(t=>["tag:"+t.id,t.name+" wagon"]));
   return `<select class="pick" data-item="${esc(n)}" aria-label="Where ${esc(n)} goes">`+opts.map(([v,l])=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(l)}</option>`).join("")+"</select>"+(st.mine?`<button class="swap" data-item="${esc(n)}" data-to="">Undo my choice</button>`:""); }
 function itemRow(n){
   const it=I[n]; const made=it.kind==="made"&&!it.liq; const st=status(n); const users=it.uses.filter(inTier);
@@ -605,7 +624,7 @@ function renderItems(){
     const name=r.made?`<button class="link" data-mod="${esc(r.n)}">${esc(r.n)}</button>`:`<span class="name">${esc(r.n)}</span>`;
     const used=[...r.users.map(u=>`<span class="chip">${esc(u)}</span>`), r.it.heat>0?`<span class="chip furnc">Furnaces</span>`:"", (r.it.nutr>0&&r.it.fspeed>0)?`<span class="chip nursc">Nurseries</span>`:"", r.it.relic?`<span class="chip resc">Research</span>`:"", r.it.sell?`<span class="chip shopc">Shop</span>`:""].join("")||"—";
     const act=r.made?picker(r.n,r.st):"";
-    return `<tr><td class="nmc">${name}</td><td class="stc"><span class="st ${r.st.code}">${esc(label(r.st))}</span>${r.st.mine?'<div class="mine">your choice</div>':""}</td><td class="why">${esc(r.st.why)}</td><td class="act">${act}</td><td class="usedc"><div class="chips">${used}</div></td><td class="num">${r.it.sell?price(r.n).toLocaleString():""}</td><td class="num">${r.it.tier}</td></tr>`; }).join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
+    return `<tr><td class="nmc">${name}</td><td class="stc"><span class="st ${r.st.code}">${esc(label(r.st))}</span>${r.st.mine?'<div class="mine">your choice</div>':""}</td><td class="why">${esc(r.st.why)}</td><td class="act">${act}</td><td class="usedc"><div class="chips">${used}</div></td><td class="num"${r.it.sell?` title="${price(r.n).toLocaleString()}"`:""}>${r.it.sell?short(price(r.n)):""}</td><td class="num">${r.it.tier}</td></tr>`; }).join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
 }
 $("q").oninput=renderItems;
 $("rows").addEventListener("click",e=>{ const s=e.target.closest(".swap"); if(s){ decide(s.dataset.item,s.dataset.to||null); return; } const b=e.target.closest("[data-mod]"); if(b) openMod(b.dataset.mod); });

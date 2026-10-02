@@ -187,3 +187,20 @@ table.items td.act .swap{display:block;margin-top:4px}
 .addrow input.addto.bad{border-color:var(--copper)}
 .addrow .addbtn{font:inherit;font-size:13px;font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:3px 10px;color:var(--ink);cursor:pointer}
 .addrow .addbtn:hover{border-color:var(--verd);color:var(--verd)}
+/* the bus table always fits its box: fixed column shares, names and labels wrap */
+#pane-items table.items{table-layout:fixed;min-width:860px}
+#pane-items table.items th,#pane-items table.items td{padding:9px 8px}
+#pane-items table.items th:nth-child(1){width:13%}
+#pane-items table.items th:nth-child(2){width:15%}
+#pane-items table.items th:nth-child(4){width:13%}
+#pane-items table.items th:nth-child(5){width:17%}
+#pane-items table.items th:nth-child(6){width:7%}
+#pane-items table.items th:nth-child(7){width:5%}
+#pane-items table.items td.nmc,#pane-items table.items td.stc,#pane-items table.items td.act{white-space:normal;width:auto}
+#pane-items table.items td.nmc{overflow-wrap:anywhere}
+#pane-items table.items td.nmc .link{text-align:left;white-space:normal}
+#pane-items table.items td.why,#pane-items table.items td.usedc{min-width:0;max-width:none;width:auto}
+#pane-items table.items .st{white-space:normal}
+#pane-items table.items .chip{white-space:normal}
+#pane-items select.pick{width:100%;box-sizing:border-box}
+#pane-items tr.itemhead th{white-space:normal}

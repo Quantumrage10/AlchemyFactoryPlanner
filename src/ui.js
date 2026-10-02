@@ -59,6 +59,8 @@ function applyUpgrades(){ const v=id=>+$(id).value||0; C.setSupplies($("fuelsel"
   const pct=x=>Math.round(x*100)+"%";
   $("upnote").textContent="Belts carry "+fmt(u.belt)+"/min. Machines run at "+pct(u.speed)+" speed. Extractors and alembics yield "+pct(u.alch)+". Fertilizer feeds "+pct(u.fert)+" as much. Shop prices are "+pct(u.sell)+".";
   $("connnote").textContent="each carries "+fmt(2*u.belt)+"/min (two belts)"; return u; }
+// big prices in short form for the table: 30k, 1.12M, 178M
+function short(x){ if(x<10000) return x.toLocaleString(); const U=[[1e9,"B"],[1e6,"M"],[1e3,"k"]]; for(let i=0;i<U.length;i++){ const [u,s]=U[i]; if(x>=u){ const v=+(x/u).toPrecision(3); if(v>=1000&&i>0) return +(x/U[i-1][0]).toPrecision(3)+U[i-1][1]; return v+s; } } return String(x); }
 const price=n=>Math.round((I[n].sell||0)*C.sellMult()*10)/10;
 function line(){ const k=tierMax()+"|"+cap()+"|"+C.belt()+"|"+C.speed()+"|"+C.yieldOf({machine:"Extractor"})+"|"+C.fertValue()+"|"+C.fuel()+"|"+C.fert(); if(k!==lineKey){ LINE=C.busLine(tierMax(),cap()); lineKey=k; } return LINE; }
 // Which shared wagon type an item would ride: anything that burns the fuel wagon, anything that feeds nurseries
@@ -114,7 +116,7 @@ tog("f-ded","ded"); tog("f-mix","mix"); tog("f-maybe","maybe"); tog("f-no","no")
 let sortK="bus", sortDir=1;
 // the picker: where this item goes. Every made item can be off the bus, a maybe, on its own wagons, or on any shared wagon.
 function picker(n,st){ const cur=valueOf(st);
-  const opts=[["off","Off the bus"],["maybe","Maybe"],["own","On the bus · own wagons"]].concat(plan.tags.map(t=>["tag:"+t.id,"On the bus · "+t.name+" wagon"]));
+  const opts=[["off","Off the bus"],["maybe","Maybe"],["own","Own wagons"]].concat(plan.tags.map(t=>["tag:"+t.id,t.name+" wagon"]));
   return `<select class="pick" data-item="${esc(n)}" aria-label="Where ${esc(n)} goes">`+opts.map(([v,l])=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(l)}</option>`).join("")+"</select>"+(st.mine?`<button class="swap" data-item="${esc(n)}" data-to="">Undo my choice</button>`:""); }
 function itemRow(n){
   const it=I[n]; const made=it.kind==="made"&&!it.liq; const st=status(n); const users=it.uses.filter(inTier);
@@ -134,7 +136,7 @@ function renderItems(){
     const name=r.made?`<button class="link" data-mod="${esc(r.n)}">${esc(r.n)}</button>`:`<span class="name">${esc(r.n)}</span>`;
     const used=[...r.users.map(u=>`<span class="chip">${esc(u)}</span>`), r.it.heat>0?`<span class="chip furnc">Furnaces</span>`:"", (r.it.nutr>0&&r.it.fspeed>0)?`<span class="chip nursc">Nurseries</span>`:"", r.it.relic?`<span class="chip resc">Research</span>`:"", r.it.sell?`<span class="chip shopc">Shop</span>`:""].join("")||"—";
     const act=r.made?picker(r.n,r.st):"";
-    return `<tr><td class="nmc">${name}</td><td class="stc"><span class="st ${r.st.code}">${esc(label(r.st))}</span>${r.st.mine?'<div class="mine">your choice</div>':""}</td><td class="why">${esc(r.st.why)}</td><td class="act">${act}</td><td class="usedc"><div class="chips">${used}</div></td><td class="num">${r.it.sell?price(r.n).toLocaleString():""}</td><td class="num">${r.it.tier}</td></tr>`; }).join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
+    return `<tr><td class="nmc">${name}</td><td class="stc"><span class="st ${r.st.code}">${esc(label(r.st))}</span>${r.st.mine?'<div class="mine">your choice</div>':""}</td><td class="why">${esc(r.st.why)}</td><td class="act">${act}</td><td class="usedc"><div class="chips">${used}</div></td><td class="num"${r.it.sell?` title="${price(r.n).toLocaleString()}"`:""}>${r.it.sell?short(price(r.n)):""}</td><td class="num">${r.it.tier}</td></tr>`; }).join("")||`<tr><td colspan="7" class="empty">Nothing matches.</td></tr>`;
 }
 $("q").oninput=renderItems;
 $("rows").addEventListener("click",e=>{ const s=e.target.closest(".swap"); if(s){ decide(s.dataset.item,s.dataset.to||null); return; } const b=e.target.closest("[data-mod]"); if(b) openMod(b.dataset.mod); });
