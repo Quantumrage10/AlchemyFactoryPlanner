@@ -254,7 +254,7 @@ function chain(root,cs){ const depth={}, into={}, kids={};
 // Byproduct arrows, drawn once the boxes are in place: a dashed line from the box of the machine a byproduct comes
 // out of to the box that uses it. It leaves the top or bottom of one box and enters the top or bottom of the other,
 // running behind any box in between; when both are in the same row it loops underneath.
-let byArrows=[], treeZoom=1, treeX=0, treeY=0, treeRoot=null, treeFresh=true, treeFocus=null;
+let treePan=0, treeEdge=0, byArrows=[], treeZoom=1, treeX=0, treeY=0, treeRoot=null, treeFresh=true, treeFocus=null;
 const EYE='<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>';
 // "Show only this": the eye on a box cuts the tree down to that box and everything that goes into it. A byproduct that
 // comes in from a part of the module that is no longer shown is kept, as a box of its own saying where it comes from.
@@ -296,7 +296,24 @@ function placeTree(reset){ const flow=$("ingr"), zw=flow.firstElementChild; if(!
 // on screen. Plain scrolling past it is left alone.
 function frameTree(){ const d=$("ingr").getBoundingClientRect().top-20; if(Math.abs(d)>2&&window.scrollBy) window.scrollBy({top:d,behavior:"smooth"}); }
 // Ctrl + scroll zooms on the spot under the mouse.
-$("ingr").addEventListener("wheel",e=>{ if(!e.ctrlKey) return; e.preventDefault(); const flow=$("ingr"); if(!flow.firstElementChild) return;
+// The plain scroll wheel moves the tree up and down, but only while the tree window is the thing framed on screen and the
+// tree has more to show in that direction. Otherwise, and once the tree reaches its edge, the wheel scrolls the page as usual.
+$("ingr").addEventListener("wheel",e=>{ const flow=$("ingr"), zw=flow.firstElementChild; if(!zw) return;
+  if(!e.ctrlKey){ const r=flow.getBoundingClientRect(), h=zw.offsetHeight*treeZoom, ch=flow.clientHeight;
+    const dy=e.deltaMode===1?e.deltaY*40:(e.deltaMode===2?e.deltaY*ch:e.deltaY), more=dy>0?treeY+h>ch+1:treeY<-1;
+    if(Math.abs(r.top-20)>40) return;
+    // a sideways wheel (or Shift + wheel) slides the tree left and right the same way
+    const k=e.deltaMode===1?40:1, dx=(e.deltaX||(e.shiftKey?e.deltaY:0))*k;
+    if(dx){ const w=zw.offsetWidth*treeZoom, cw=flow.clientWidth; if(dx>0?treeX+w>cw+1:treeX<-1){ e.preventDefault();
+        treeX=dx>0?Math.max(Math.min(treeX,cw-w),treeX-dx):Math.min(Math.max(treeX,0),treeX-dx); placeTree(false); }
+      if(e.shiftKey||!e.deltaY) return; }
+    // at the edge: the same spin of the wheel that was moving the tree stops dead here. The page only starts to scroll
+    // after a pause, so you cannot overshoot, and scrolling again is how you leave.
+    // (it holds for about a third of a second from the moment the edge is reached, then lets go even if you never stopped)
+    if(!more){ const now=Date.now(); if(now-treePan<450){ if(!treeEdge) treeEdge=now; if(now-treeEdge<350){ e.preventDefault(); treePan=now; } } return; }
+    treePan=Date.now(); treeEdge=0;
+    e.preventDefault(); treeY=dy>0?Math.max(Math.min(treeY,ch-h),treeY-dy):Math.min(Math.max(treeY,0),treeY-dy); placeTree(false); return; }
+  e.preventDefault();
   const old=treeZoom, z=Math.min(2.5,Math.max(0.1,old*(e.deltaY<0?1.12:1/1.12))); if(z===old) return;
   const r=flow.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
   treeX=mx-(mx-treeX)*z/old; treeY=my-(my-treeY)*z/old; treeZoom=z; placeTree(false); frameTree(); },{passive:false});
