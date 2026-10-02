@@ -409,6 +409,9 @@ svg.bylines>path.vis.hl{stroke-width:calc(var(--lw,2px)*1.75)}
 .node.haseye{padding-right:26px}
 .flow.drag{-webkit-user-select:none;user-select:none}
 @media (min-width:980px){.tablebox,#pane-items>.tablebox,#pane-rates>.tablebox,#pane-mods .detail>.tablebox{overflow:visible}}
+/* the dot where a byproduct line joins a shared line */
+svg.bylines>circle.vis{fill:currentColor;stroke:none}
+svg.bylines>circle.vis.hl{color:var(--copper)}
 </style>
 </head>
 <body>
@@ -952,7 +955,7 @@ function chain(root,cs){ const depth={}, into={}, kids={};
 // Byproduct arrows, drawn once the boxes are in place: a dashed line from the box of the machine a byproduct comes
 // out of to the box that uses it. It leaves the top or bottom of one box and enters the top or bottom of the other,
 // running behind any box in between; when both are in the same row it loops underneath.
-let treePan=0, treeEdge=0, byArrows=[], treeZoom=1, treeX=0, treeY=0, treeRoot=null, treeFresh=true, treeFocus=null;
+let treePan=0, treeEdge=0, byGroup={}, byArrows=[], treeZoom=1, treeX=0, treeY=0, treeRoot=null, treeFresh=true, treeFocus=null;
 const EYE='<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>';
 // "Show only this": the eye on a box cuts the tree down to that box and everything that goes into it. A byproduct that
 // comes in from a part of the module that is no longer shown is kept, as a box of its own saying where it comes from.
@@ -1045,19 +1048,27 @@ $("treereset").onclick=()=>{ treeFresh=true; layoutTree(); };
   const byEnds=a=>{ const nodes=Array.from(flow.querySelectorAll(".node")), te=nodes.find(e=>e.dataset.id===String(a.to)); return {te,pe:a.self?te:(a.fromId!=null&&nodes.find(e=>e.dataset.id===String(a.fromId)))||nodes.find(e=>e.dataset.n===a.from)}; };
   const mark=h=>{ clear(); if(!h) return; flow.classList.add("online");
     if(h.kind==="feed"){ h.branch.classList.add("hl"); return; }
-    const a=byArrows[h.i]; if(!a) return; const {te,pe}=byEnds(a); if(te) te.classList.add("hl"); if(pe) pe.classList.add("hl");
+    if(!byArrows[h.i]) return; for(const i of (byGroup[h.i]||[h.i])){ const {te,pe}=byEnds(byArrows[i]); if(te) te.classList.add("hl"); if(pe) pe.classList.add("hl"); }
     for(const e of flow.querySelectorAll('[data-i="'+h.i+'"]')) e.classList.add("hl"); };
   flow.addEventListener("mousemove",e=>{ if(flow.classList.contains("drag")&&down&&down.moved) return; const h=hit(e), k=keyOf(h); if(k!==cur){ cur=k; mark(h); } });
   flow.addEventListener("mouseleave",()=>{ cur=""; clear(); });
   // the card
-  // a name in the card is a button: pressing it moves the tree to put that box in the middle of the window and lights it up
+  // a name in the card is a button: pressing it moves the tree to put that box right beside the card and lights it up
   const go=(name,nd)=>nd?'<button class="link goto" data-goto="'+esc(nd.dataset.id)+'">'+esc(name)+'</button>':'<b>'+esc(name)+'</b>';
   const focus=id=>{ const nd=Array.from(flow.querySelectorAll(".node")).find(e=>e.dataset.id===String(id)); if(!nd) return;
     const fr=flow.getBoundingClientRect(), r=nd.getBoundingClientRect();
-    treeX+=fr.left+fr.width/2-(r.left+r.width/2); treeY+=fr.top+fr.height/2-(r.top+r.height/2); placeTree(false);
+    // put the box just above the open card (or just below it if there is no room above), never underneath it
+    let cx=fr.left+fr.width/2, cy=fr.top+fr.height/2;
+    if(!tip.hidden){ const tr=tip.getBoundingClientRect(); cx=Math.min(fr.right-r.width/2-8,Math.max(fr.left+r.width/2+8,tr.left+tr.width/2));
+      cy=tr.top-r.height/2-18>fr.top+r.height/2?tr.top-r.height/2-18:tr.bottom+r.height/2+18; }
+    treeX+=cx-(r.left+r.width/2); treeY+=cy-(r.top+r.height/2); placeTree(false);
     clear(); nd.classList.add("hl"); cur="focus"; };
   const li=(name,amt,note,nd)=>'<li>'+go(name,nd)+' <span class="amt">'+esc(amt)+'</span>'+(note?'<div class="mut">'+esc(note)+'</div>':"")+'</li>';
-  const card=h=>{ if(h.kind==="by"){ const a=byArrows[h.i]; if(!a) return ""; const {te,pe}=byEnds(a), user=te?te.dataset.n:"";
+  const card=h=>{ if(h.kind==="by"&&byGroup[h.i]){ const g=byGroup[h.i], a0=byArrows[g[0]], te=byEnds(a0).te, user=te?te.dataset.n:"";
+      return '<h4>'+esc(a0.item)+' <span class="amt">'+fmt(g.reduce((t,i)=>t+byArrows[i].amt,0))+'/min</span></h4><p class="mut">A byproduct, from '+g.length+' machines on one line.</p>'
+        +'<p>It goes into the <b>'+esc(R[user]?R[user].machine:"machine")+'</b> making '+go(user,te)+'.</p><p>It comes out of:</p><ul>'
+        +g.map(i=>{ const a=byArrows[i]; return li(a.from,fmt(a.amt)+"/min","the "+R[a.from].machine,byEnds(a).pe); }).join("")+'</ul>'; }
+    if(h.kind==="by"){ const a=byArrows[h.i]; if(!a) return ""; const {te,pe}=byEnds(a), user=te?te.dataset.n:"";
       return '<h4>'+esc(a.item)+' <span class="amt">'+fmt(a.amt)+'/min</span></h4><p class="mut">A byproduct.</p>'
         +'<p>It comes out of the <b>'+esc(R[a.from].machine)+'</b> making '+go(a.from,pe)+'.</p>'
         +'<p>It goes into the <b>'+esc(R[user]?R[user].machine:"machine")+'</b> making '+go(user,te)+(a.self?', which is the same machine it came out of':'')+'.</p>'
@@ -1085,7 +1096,49 @@ function drawBy(){ const flow=$("ingr"), svg=flow.querySelector("svg.bylines"), 
   // every stretch of line is checked against the ones already drawn and nudged aside until it has a lane to itself
   const freeY=(y,x1,x2,step)=>{ const lo=Math.min(x1,x2), hi=Math.max(x1,x2); for(let g=0;g<16&&hs.some(q=>Math.abs(q.y-y)<9&&q.lo<hi&&q.hi>lo);g++) y+=step; hs.push({y,lo,hi}); return y; };
   const freeX=(x,y1,y2,step)=>{ const lo=Math.min(y1,y2), hi=Math.max(y1,y2); for(let g=0;g<16&&vs.some(q=>Math.abs(q.x-x)<9&&q.lo<hi&&q.hi>lo);g++) x+=step; vs.push({x,lo,hi}); return x; };
-  for(const a of byArrows){ const te=nodes.find(e=>e.dataset.id===String(a.to)), pe=a.self?te:(a.fromId!=null&&nodes.find(e=>e.dataset.id===String(a.fromId)))||nodes.find(e=>e.dataset.n===a.from); if(!pe||!te) continue; const p=box(pe), t=box(te);
+  // MERGED LINES. When two or more machines send the same byproduct to the same machine, they share one line into it,
+  // with a dot wherever one joins, and a single arrow carries the total in. (One machine feeding several places is not
+  // merged: those really are separate deliveries.)
+  byGroup={}; const merged=new Set(), sets={};
+  byArrows.forEach((a,i)=>{ if(!a.self) (sets[a.to+"|"+a.item]=sets[a.to+"|"+a.item]||[]).push(i); });
+  for(const key in sets){ const g=sets[key]; if(g.length<2) continue;
+    const te=nodes.find(e=>e.dataset.id===String(byArrows[g[0]].to)); if(!te) continue; const t=box(te);
+    const srcs=g.map(i=>{ const a=byArrows[i], el=(a.fromId!=null&&nodes.find(e=>e.dataset.id===String(a.fromId)))||nodes.find(e=>e.dataset.n===a.from); return el?{i,b:box(el),el}:null; }).filter(Boolean);
+    if(srcs.length<2) continue;
+    // One trunk, like the spine of a comb: a single straight line that every source joins by the shortest hop, straight
+    // out of the side of its box, so no two lines ever run side by side. The trunk then goes into the receiving box:
+    // straight in through its top or bottom when the trunk lines up with it, otherwise with one turn into its side.
+    // The trunk can stand in several places (beside any of the boxes involved, or over the receiving box). Each is
+    // costed and the cheapest wins: passing behind a box costs most, a turn a little, length least.
+    const first=g[0], boxesButT=nodes.filter(el=>el!==te).map(el=>({el,b:box(el)})), tcx=Math.round(t.l+t.w/2), tpy=Math.round(t.t+t.h*0.3);
+    const behind=(x1,y1,x2,y2,own)=>{ const l=Math.min(x1,x2), r=Math.max(x1,x2), tp=Math.min(y1,y2), bt=Math.max(y1,y2); let n=0;
+      for(const o of boxesButT) if(o.el!==own&&l<o.b.l+o.b.w-2&&r>o.b.l+2&&tp<o.b.t+o.b.h-2&&bt>o.b.t+2) n++; return n; };
+    const comb=X=>{ const over=X>t.l+8&&X<t.l+t.w-8, stubs=[]; let cost=0;
+      const joins=srcs.map(s=>{ const bb=s.b, inCol=X>bb.l-4&&X<bb.l+bb.w+4;
+        if(inCol){ const up=t.t+t.h/2<bb.t+bb.h/2; return Math.round(up?bb.t:bb.t+bb.h); }
+        const y=Math.round(bb.t+bb.h*0.3), x0=Math.round(X>bb.l+bb.w/2?bb.l+bb.w:bb.l); stubs.push({x0,y}); cost+=behind(x0,y,X,y,s.el)*1000+Math.abs(X-x0)*0.02; return y; });
+      let y0=Math.min(...joins), y1=Math.max(...joins), end;
+      if(over){ if(y1<=t.t) { y1=Math.round(t.t-1); end={x:X,y:y1,down:true}; } else if(y0>=t.t+t.h){ y0=Math.round(t.t+t.h+1); end={x:X,y:y0,up:true}; } else return null; }
+      else { y0=Math.min(y0,tpy); y1=Math.max(y1,tpy); const x1=Math.round(X<t.l?t.l-1:t.l+t.w+1); end={x:x1,y:tpy,side:true}; cost+=20+behind(X,tpy,x1,tpy,null)*1000+Math.abs(x1-X)*0.02; }
+      // the trunk may start or stop inside a source's own column without counting that source as passed behind
+      cost+=srcs.reduce((n,s)=>n,0)+boxesButT.filter(o=>{ const bb=o.b; if(!(X>bb.l+2&&X<bb.l+bb.w-2&&y0<bb.t+bb.h-2&&y1>bb.t+2)) return false;
+        const src=srcs.find(s=>s.el===o.el); return !(src&&(Math.abs(y0-bb.t)<3||Math.abs(y0-(bb.t+bb.h))<3||Math.abs(y1-bb.t)<3||Math.abs(y1-(bb.t+bb.h))<3)); }).length*1000+(y1-y0)*0.02;
+      return {X,stubs,y0,y1,end,cost}; };
+    const spots=[tcx,Math.round(t.l-16),Math.round(t.l+t.w+16)]; for(const s of srcs){ spots.push(Math.round(s.b.l+s.b.w+16),Math.round(s.b.l-16),Math.round(s.b.l+s.b.w/2)); }
+    let best=null; for(const X of spots){ if(X<4) continue; const c=comb(X); if(c&&(!best||c.cost<best.cost)) best=c; }
+    if(!best) continue;
+    const X=freeX(best.X,best.y0,best.y1,10), P=X===best.X?best:(comb(X)||best), add=(d,head)=>{ lines+='<path class="vis" data-i="'+first+'" d="'+d+'"'+(head?' marker-end="url(#byhead)"':"")+'/><path class="hit" data-i="'+first+'" d="'+d+'"/>'; };
+    for(const s of P.stubs){ add("M"+s.x0+" "+s.y+"H"+P.X,false); if(s.y>P.y0+1&&s.y<P.y1-1) lines+='<circle class="vis" data-i="'+first+'" cx="'+P.X+'" cy="'+s.y+'" r="3.5"/>'; }
+    if(P.end.side){ add("M"+P.X+" "+P.y0+"V"+P.y1,false); add("M"+P.X+" "+P.end.y+"H"+P.end.x,true); if(P.end.y>P.y0+1&&P.end.y<P.y1-1) lines+='<circle class="vis" data-i="'+first+'" cx="'+P.X+'" cy="'+P.end.y+'" r="3.5"/>'; }
+    else if(P.end.down) add("M"+P.X+" "+P.y0+"V"+P.y1,true); else add("M"+P.X+" "+P.y1+"V"+P.y0,true);
+    vs.push({x:P.X,lo:P.y0,hi:P.y1});
+    const total=g.reduce((sum,i)=>sum+byArrows[i].amt,0), txt=byArrows[first].item+" "+fmt(total)+"/min", lw=txt.length*6.8+10, lh=18;
+    const free=(x,y)=>!allBoxes.some(o=>x-lw/2<o.l+o.w&&x+lw/2>o.l&&y-lh/2<o.t+o.h&&y+lh/2>o.t)&&!placed.some(o=>x-lw/2<o.r&&x+lw/2>o.l&&y-lh/2<o.b&&y+lh/2>o.t);
+    let lx=P.X, ly=(P.y0+P.y1)/2; for(const f of [0.5,0.3,0.7,0.15,0.85]){ const y=P.y0+(P.y1-P.y0)*f; if(free(P.X,y)){ ly=y; break; } }
+    placed.push({l:lx-lw/2,r:lx+lw/2,t:ly-lh/2,b:ly+lh/2});
+    labels+='<text data-i="'+first+'" x="'+Math.round(lx)+'" y="'+(Math.round(ly)+4)+'" text-anchor="middle">'+esc(txt)+'</text>';
+    for(const i of g){ merged.add(i); byGroup[i]=g; } }
+  for(const a of byArrows){ const te=nodes.find(e=>e.dataset.id===String(a.to)), pe=a.self?te:(a.fromId!=null&&nodes.find(e=>e.dataset.id===String(a.fromId)))||nodes.find(e=>e.dataset.n===a.from); if(!pe||!te||merged.has(byArrows.indexOf(a))) continue; const p=box(pe), t=box(te);
     const kt=usedIn[a.to]=(usedIn[a.to]||0)+1, k=used[a.fromId!=null?"#"+a.fromId:a.from]=(used[a.fromId!=null?"#"+a.fromId:a.from]||0)+1, ol=Math.max(p.l,t.l), or=Math.min(p.l+p.w,t.l+t.w); let pts;
     const above=t.t+t.h<=p.t-14, below=t.t>=p.t+p.h+14, pcx=Math.round(p.l+p.w/2+10*(k-1)), tcx=Math.round(t.l+t.w/2-10*(kt-1));
     if(pe!==te&&(above||below)&&or-ol>=30){

@@ -398,3 +398,6 @@ svg.bylines>path.vis.hl{stroke-width:calc(var(--lw,2px)*1.75)}
 .node.haseye{padding-right:26px}
 .flow.drag{-webkit-user-select:none;user-select:none}
 @media (min-width:980px){.tablebox,#pane-items>.tablebox,#pane-rates>.tablebox,#pane-mods .detail>.tablebox{overflow:visible}}
+/* the dot where a byproduct line joins a shared line */
+svg.bylines>circle.vis{fill:currentColor;stroke:none}
+svg.bylines>circle.vis.hl{color:var(--copper)}
