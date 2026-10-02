@@ -279,27 +279,29 @@ $("treefocusoff").onclick=()=>{ treeFocus=null; treeFresh=true; renderMod(); };
 // The tree sits in a window you can move around in, like a map. Ctrl + scroll zooms in or out on the spot under the
 // mouse, dragging slides it, and plain scrolling still scrolls the page. Opening another module starts it at full size.
 const treeTf=()=>"translate("+treeX+"px,"+treeY+"px) scale("+treeZoom+")";
-// The tree window works like a map or a diagram viewer. It is as tall as the tree until that would be taller than the
-// window, then it stops growing and you move around inside it. The tree can never be dragged out of its window.
+// The tree window works like a map. It is always the height of the browser window, whatever the zoom, so zooming never
+// changes the length of the page. It opens with the whole tree in view. While the tree fits it sits still in the
+// middle; once you zoom in past the edges you can drag it around, and it can never be dragged out of the window.
+// Nothing here ever scrolls the page.
 function placeTree(reset){ const flow=$("ingr"), zw=flow.firstElementChild; if(!zw) return; const W0=zw.offsetWidth, H0=zw.offsetHeight;
-  if(reset){ treeZoom=1; treeX=Math.round((flow.clientWidth-W0)/2); treeY=0; }
-  const z=treeZoom, cap=Math.max(240,Math.round((window.innerHeight||800)*0.85));
-  flow.style.height=Math.min(Math.ceil(H0*z),cap)+"px";
-  const cw=flow.clientWidth, ch=flow.clientHeight, w=W0*z, h=H0*z;
-  const clamp=(v,size,room)=>size<=room?Math.min(room-size,Math.max(0,v)):Math.min(0,Math.max(room-size,v));
-  treeX=Math.round(clamp(treeX,w,cw)); treeY=Math.round(clamp(treeY,h,ch));
+  flow.style.height=Math.max(320,Math.round((window.innerHeight||800)-40))+"px";
+  const cw=flow.clientWidth, ch=flow.clientHeight;
+  if(reset){ treeZoom=Math.min(1,cw/W0,ch/H0); treeX=0; treeY=0; }
+  const w=W0*treeZoom, h=H0*treeZoom, hold=(v,size,room)=>size<=room?(room-size)/2:Math.min(0,Math.max(room-size,v));
+  treeX=Math.round(hold(treeX,w,cw)); treeY=Math.round(hold(treeY,h,ch));
   zw.style.transform=treeTf(); }
-// Ctrl + scroll zooms on the spot under the mouse. If the window itself changes height, the page scrolls to keep that spot still.
+// As soon as you start working with the tree (pressing on it, or zooming it) the page slides so the whole tree window is
+// on screen. Plain scrolling past it is left alone.
+function frameTree(){ const d=$("ingr").getBoundingClientRect().top-20; if(Math.abs(d)>2&&window.scrollBy) window.scrollBy({top:d,behavior:"smooth"}); }
+// Ctrl + scroll zooms on the spot under the mouse.
 $("ingr").addEventListener("wheel",e=>{ if(!e.ctrlKey) return; e.preventDefault(); const flow=$("ingr"); if(!flow.firstElementChild) return;
   const old=treeZoom, z=Math.min(2.5,Math.max(0.1,old*(e.deltaY<0?1.12:1/1.12))); if(z===old) return;
-  const r=flow.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top, oy=treeY;
-  treeX=mx-(mx-treeX)*z/old; treeY=my-(my-treeY)*z/old; treeZoom=z; placeTree(false);
-  const drift=treeY+(my-oy)*z/old-my; if(Math.abs(drift)>0.5&&window.scrollBy) window.scrollBy(0,drift); },{passive:false});
-// Dragging moves the tree in any direction. Once it can't move any further up or down, the drag scrolls the page instead.
+  const r=flow.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  treeX=mx-(mx-treeX)*z/old; treeY=my-(my-treeY)*z/old; treeZoom=z; placeTree(false); frameTree(); },{passive:false});
+// Dragging moves the tree inside its window, in whichever directions it is bigger than the window.
 { let drag=false; const flow=$("ingr");
-  flow.addEventListener("pointerdown",e=>{ if(e.button!==0||e.target.closest("button")) return; drag=true; flow.classList.add("drag"); flow.setPointerCapture&&flow.setPointerCapture(e.pointerId); });
-  flow.addEventListener("pointermove",e=>{ if(!drag) return; treeX+=e.movementX; const want=treeY+e.movementY; treeY=want; placeTree(false);
-    const left=want-treeY; if(Math.abs(left)>0.5&&window.scrollBy) window.scrollBy(0,-left); });
+  flow.addEventListener("pointerdown",e=>{ if(e.button!==0) return; frameTree(); if(e.target.closest("button")) return; drag=true; flow.classList.add("drag"); flow.setPointerCapture&&flow.setPointerCapture(e.pointerId); });
+  flow.addEventListener("pointermove",e=>{ if(!drag) return; treeX+=e.movementX; treeY+=e.movementY; placeTree(false); });
   const stop=()=>{ drag=false; flow.classList.remove("drag"); }; flow.addEventListener("pointerup",stop); flow.addEventListener("pointercancel",stop); }
 $("treereset").onclick=()=>{ treeFresh=true; layoutTree(); };
 // Lines you can point at. Hovering a line lights up the line and the boxes it joins: for a solid line, the item and
@@ -331,7 +333,6 @@ $("treereset").onclick=()=>{ treeFresh=true; layoutTree(); };
   const focus=id=>{ const nd=Array.from(flow.querySelectorAll(".node")).find(e=>e.dataset.id===String(id)); if(!nd) return;
     const fr=flow.getBoundingClientRect(), r=nd.getBoundingClientRect();
     treeX+=fr.left+fr.width/2-(r.left+r.width/2); treeY+=fr.top+fr.height/2-(r.top+r.height/2); placeTree(false);
-    if(nd.scrollIntoView) nd.scrollIntoView({block:"center",inline:"nearest",behavior:"smooth"});
     clear(); nd.classList.add("hl"); cur="focus"; };
   const li=(name,amt,note,nd)=>'<li>'+go(name,nd)+' <span class="amt">'+esc(amt)+'</span>'+(note?'<div class="mut">'+esc(note)+'</div>':"")+'</li>';
   const card=h=>{ if(h.kind==="by"){ const a=byArrows[h.i]; if(!a) return ""; const {te,pe}=byEnds(a), user=te?te.dataset.n:"";
