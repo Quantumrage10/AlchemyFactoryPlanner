@@ -27,7 +27,7 @@ const init = { fe: '0', mL: '14', mW: '14', mH: '15', connmax: '8', lvlbelt: '0'
 for (const k in init) doc.getElementById(k).value = init[k];
 const store = {};
 const ls = { getItem: k => store[k] || null, setItem: (k, v) => { store[k] = v; } };
-const api = new Function('document', 'localStorage', 'window', script + '\n;return {addToTag,openMod,decide,status,setPlace,addTag,deleteTag,resetPlan,clearPlan,valueOf};')(doc, ls, { scrollTo() {} });
+const api = new Function('document', 'localStorage', 'window', script + '\n;return {openMod,decide,status,setPlace,addTag,deleteTag,resetPlan,clearPlan,valueOf};')(doc, ls, { scrollTo() {} });
 const strip = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const must = (cond, msg) => { if (!cond) { console.error('Smoke test failed: ' + msg); process.exit(1); } };
 // a stylesheet that closes its own <style> tag, or contains script, spills onto the page as text
@@ -105,9 +105,6 @@ api.setPlace('Glass', 'tag:' + tid);
 must(api.status('Glass').code === 'mix' && /Yes · saturn parts wagon/.test(strip(els.rows.innerHTML)), 'an item should be addable to a shared wagon you made');
 api.openMod('Saturn');
 must(/Glass/.test(strip(els.busin.innerHTML)) && !/Brick/.test(strip(els.busin.innerHTML)), 'modules should follow the plan: ' + strip(els.busin.innerHTML));
-doc.getElementById('add-' + tid).value = 'brick'; api.addToTag(tid);
-must(where('Brick') === 'tag:' + tid, 'typing an item and pressing Add should put it on that wagon');
-api.setPlace('Brick', 'maybe');
 api.deleteTag(tid);
 must(where('Glass') === 'own', 'deleting a shared wagon should put its items back');
 // clearing takes everything off the bus; resetting brings the recommended layout back

@@ -149,14 +149,17 @@ function renameTag(id,name){ const t=tagById(id); name=String(name||"").trim(); 
 function deleteTag(id){ plan.tags=plan.tags.filter(t=>t.id!==id); for(const k in plan.place) if(plan.place[k]==="tag:"+id) delete plan.place[k]; savePlan(); redrawAll(); }
 $("resetrec").onclick=resetPlan; $("clearall").onclick=clearPlan;
 $("addtag").onclick=()=>{ if(addTag($("newtag").value)) $("newtag").value=""; };
-// adding to a shared wagon only happens on the Add button or Enter, never just by picking or clicking away
-function addToTag(id){ const box=$("add-"+id), q=String(box.value||"").trim().toLowerCase(); if(!q) return;
-  const all=modNames(); let hit=all.find(n=>n.toLowerCase()===q); if(!hit){ const m=all.filter(n=>n.toLowerCase().includes(q)); if(m.length===1) hit=m[0]; }
-  if(hit) setPlace(hit,"tag:"+id); else box.classList&&box.classList.add("bad"); }
-$("tags").addEventListener("keydown",e=>{ const i=e.target.closest("input.addto"); if(!i) return; i.classList.remove("bad"); if(e.key==="Enter"){ e.preventDefault(); addToTag(i.dataset.tag); } });
-$("tags").addEventListener("click",e=>{ const ab=e.target.closest(".addbtn"); if(ab){ addToTag(ab.dataset.tag); return; } const d=e.target.closest(".deltag"); if(d){ deleteTag(d.dataset.tag); return; } const x=e.target.closest(".rm"); if(x) setPlace(x.dataset.item,"own"); });
+// adding to a shared wagon works like the module search: click the box and the list drops down, type to narrow it, click a name to add it
+function fillAddList(inp){ const id=inp.dataset.tag, q=inp.value.trim().toLowerCase(), box=$("addlist-"+id); if(!box) return;
+  const names=modNames().filter(n=>valueOf(status(n))!=="tag:"+id&&(!q||n.toLowerCase().includes(q)));
+  box.innerHTML=names.map(n=>'<button data-item="'+esc(n)+'" data-tag="'+esc(id)+'"><span>'+esc(n)+'</span><small>T'+I[n].tier+'</small></button>').join("")||'<div class="empty" style="padding:10px">Nothing matches.</div>'; box.hidden=false; }
+$("tags").addEventListener("focusin",e=>{ const i=e.target.closest("input.addto"); if(i) fillAddList(i); });
+$("tags").addEventListener("input",e=>{ const i=e.target.closest("input.addto"); if(i) fillAddList(i); });
+$("tags").addEventListener("focusout",e=>{ const i=e.target.closest("input.addto"); if(i) setTimeout(()=>{ const box=$("addlist-"+i.dataset.tag); if(box) box.hidden=true; },150); });
+$("tags").addEventListener("mousedown",e=>{ const b=e.target.closest(".droplist button"); if(!b) return; e.preventDefault(); setPlace(b.dataset.item,"tag:"+b.dataset.tag); });
+$("tags").addEventListener("click",e=>{ const d=e.target.closest(".deltag"); if(d){ deleteTag(d.dataset.tag); return; } const x=e.target.closest(".rm"); if(x) setPlace(x.dataset.item,"own"); });
 $("tags").addEventListener("change",e=>{ const r=e.target.closest("input.tagname"); if(r) renameTag(r.dataset.tag,r.value); });
-function renderBoard(){ const made=modNames(), st={}; $("madelist").innerHTML=made.map(n=>'<option value="'+esc(n)+'">').join(""); for(const n of made) st[n]=status(n);
+function renderBoard(){ const made=modNames(), st={}; for(const n of made) st[n]=status(n);
   const own=made.filter(n=>st[n].code==="ded").length, mem=t=>made.filter(n=>st[n].code==="mix"&&st[n].wagon===t.id);
   const shared=plan.tags.filter(t=>mem(t).length).length, changed=Object.keys(plan.place).filter(k=>I[k]).length;
   $("wcount").textContent="Wagon types on your bus: "+(own+shared)+" ("+own+" with their own wagons, "+shared+" shared)";
@@ -165,7 +168,7 @@ function renderBoard(){ const made=modNames(), st={}; $("madelist").innerHTML=ma
     return `<div class="tagbox"><div class="taghead"><input class="tagname" data-tag="${id}" value="${esc(t.name)}" aria-label="Name of this shared wagon" autocomplete="off"><span class="mut">wagon · ${plural(m.length,"item")}</span><button class="deltag" data-tag="${id}">Delete</button></div>`
       +(TAGNOTE[t.id]?`<div class="fitsub">${esc(TAGNOTE[t.id])}</div>`:"")
       +`<div class="chips">${m.map(n=>`<span class="chip pick">${esc(n)} <button class="x rm" data-item="${esc(n)}" aria-label="Take ${esc(n)} off this wagon">×</button></span>`).join("")}</div>`
-      +`<div class="addrow"><input type="text" class="addto" id="add-${id}" data-tag="${id}" list="madelist" autocomplete="off" placeholder="Type an item to add…" aria-label="Item to add to this wagon"><button class="addbtn" data-tag="${id}">Add</button></div></div>`; }).join(""); }
+      +`<div class="addrow"><input type="search" class="addto" id="add-${id}" data-tag="${id}" autocomplete="off" placeholder="Add an item" aria-label="Add an item to this wagon"><nav class="modlist droplist" id="addlist-${id}" aria-label="Items to add" hidden></nav></div></div>`; }).join(""); }
 
 // ---------- tabs ----------
 const TABS=["setup","items","mods","rates"];
@@ -176,15 +179,15 @@ for(const k of TABS) $("tab-"+k).onclick=()=>setTab(k);
 // ---------- tab 2: build a module ----------
 let cur=null, lastRate=null;
 const modNames=()=>Object.keys(I).filter(n=>I[n].kind==="made"&&!I[n].liq&&inTier(n)).sort((a,b)=>I[a].tier-I[b].tier||a.localeCompare(b));
-function renderList(){
-  const q=$("mq").value.trim().toLowerCase();
-  const names=modNames().filter(n=>!q||n.toLowerCase().includes(q));
-  $("modlist").innerHTML=names.map(n=>`<button data-r="${esc(n)}" aria-current="${n===cur}"><span>${esc(n)}${onBus(n)?' <i class="bustag">bus</i>':""}</span><small>T${I[n].tier}</small></button>`).join("")||`<div class="empty" style="padding:10px">Nothing matches.</div>`;
-  $("modsel").innerHTML=modNames().map(n=>`<option value="${esc(n)}"${n===cur?" selected":""}>${esc(n)} (T${I[n].tier})</option>`).join("");
-}
-$("mq").oninput=renderList;
-$("modlist").onclick=e=>{ const b=e.target.closest("button"); if(b) openMod(b.dataset.r); };
-$("modsel").onchange=e=>openMod(e.target.value);
+// the module picker: one search box. Clicking it drops the full list down, typing narrows it, clicking a name opens it.
+function renderList(){ const q=$("mq").value.trim().toLowerCase(); const names=modNames().filter(n=>!q||n.toLowerCase().includes(q));
+  $("modlist").innerHTML=names.map(n=>'<button data-r="'+esc(n)+'" aria-current="'+(n===cur)+'"><span>'+esc(n)+(onBus(n)?' <i class="bustag">bus</i>':"")+'</span><small>T'+I[n].tier+'</small></button>').join("")||'<div class="empty" style="padding:10px">Nothing matches.</div>'; }
+const showList=on=>{ $("modlist").hidden=!on; };
+$("mq").onfocus=()=>{ renderList(); showList(true); };
+$("mq").oninput=()=>{ renderList(); showList(true); };
+$("mq").onblur=()=>setTimeout(()=>showList(false),150);
+$("mq").onkeydown=e=>{ if(e.key==="Escape"){ showList(false); $("mq").blur(); } };
+$("modlist").addEventListener("mousedown",e=>{ const b=e.target.closest("button"); if(!b) return; e.preventDefault(); $("mq").value=""; showList(false); $("mq").blur(); openMod(b.dataset.r); });
 // Everything about how big a module can be: bus connections, tile fill, and the sizes worth building.
 function sizing(root,cs){
   const one=C.solve(root,1,cs);

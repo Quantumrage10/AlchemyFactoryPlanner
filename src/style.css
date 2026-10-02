@@ -258,3 +258,25 @@ table.items td.act .swap{display:block;margin-top:4px}
 .kids>.branch:last-child::before{bottom:calc(100% - var(--a,30px) - 1px)}
 .stub{flex:0 0 14px;width:14px;height:2px;background:var(--verd)}
 .node small.mut{display:block;margin-top:3px}
+/* the module page is one column: picker on top, nothing at the side, and nothing may push it wider than the page */
+.mods{display:block}
+.detail{min-width:0}
+.detail>*{min-width:0}
+.box{min-width:0}
+.modpick{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.modpick input[type=search]{flex:0 1 300px}
+.modpick .modsel{display:block;width:auto;flex:0 1 320px;min-width:0}
+.modpick .resetbtn{margin-left:0}
+.flow{overflow-x:auto}
+/* one search box; the list drops down under it */
+.modpick{position:relative;display:block;max-width:360px;margin-bottom:0}
+.modpick input[type=search]{width:100%;box-sizing:border-box}
+.modpick .modlist{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;max-height:440px;overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.modpick .modlist:not([hidden]){display:flex}
+.modpick .modlist[hidden]{display:none}
+/* the add-an-item box on a shared wagon drops its list down the same way */
+.addrow{position:relative;display:block}
+.addrow input.addto{width:100%;box-sizing:border-box}
+.droplist{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;max-height:300px;overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.droplist:not([hidden]){display:flex}
+.droplist[hidden]{display:none}

@@ -73,7 +73,7 @@
       <div class="boardbtns"><button class="resetbtn" id="resetrec">Reset to recommended</button> <button class="resetbtn plain" id="clearall">Clear all</button></div>
     </div>
     <div class="mut"><b>Shared wagons.</b> Items in the same box ride one wagon type between them. Rename or delete a wagon, make your own, and add items here or with the picker in the table below.</div>
-    <div class="tags" id="tags"></div><datalist id="madelist"></datalist>
+    <div class="tags" id="tags"></div>
     <div class="addtagrow"><input type="text" id="newtag" autocomplete="off" placeholder="Name a new shared wagon…" aria-label="Name a new shared wagon"> <button class="resetbtn plain" id="addtag">Add shared wagon</button></div>
   </section>
     <div class="controls">
@@ -107,12 +107,11 @@
 
   <section id="pane-mods" role="tabpanel" aria-labelledby="tab-mods" class="pane" hidden>
     <div class="mods">
-      <div class="side">
-        <input type="search" id="mq" placeholder="Find a module…" aria-label="Find a module">
-        <nav class="modlist" id="modlist" aria-label="Modules"></nav>
-      </div>
       <div class="detail">
-        <select class="modsel" id="modsel" aria-label="Choose module"></select>
+        <div class="modpick">
+          <input type="search" id="mq" autocomplete="off" placeholder="Find a module…" aria-label="Find a module">
+          <nav class="modlist" id="modlist" aria-label="Modules" hidden></nav>
+        </div>
         <div class="dhead">
           <div><h2 id="mname"></h2><div class="mut" id="mmeta"></div></div>
           <div class="controls">
