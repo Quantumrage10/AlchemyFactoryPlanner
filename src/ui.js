@@ -173,13 +173,27 @@ function renderBoard(){ const made=modNames(), st={}; for(const n of made) st[n]
       +`<div class="addrow"><input type="search" class="addto" id="add-${id}" data-tag="${id}" autocomplete="off" placeholder="Add an item" aria-label="Add an item to this wagon"><nav class="modlist droplist" id="addlist-${id}" aria-label="Items to add" hidden></nav></div></div>`; }).join(""); }
 
 // ---------- tabs ----------
-// The catch: when you stop scrolling with the wheel close to a long table (or its search row), the page settles with it
-// at the top of the window. It only ever follows a wheel scroll, so clicking a tab or a button never moves the page.
-{ let timer=null; const settle=()=>{ let best=null;
-    for(const e of document.querySelectorAll("#pane-items>.controls,#pane-rates>.controls,#pane-mods .detail>.tablebox")){ if(!e.offsetParent) continue;
-      const d=e.getBoundingClientRect().top-8; if(Math.abs(d)<=110&&Math.abs(d)>1&&(best===null||Math.abs(d)<Math.abs(best))) best=d; }
+// The catch. Three things, all driven by the mouse wheel only, so a click never moves the page:
+// 1. Stop scrolling close to a long table (or its search row) and the page settles with it at the top of the window.
+// 2. While you are scrolling the page, running the mouse over a table does not grab the wheel: the page keeps going.
+//    The table only takes the wheel once the mouse has rested on it for a moment.
+// 3. When you do start scrolling inside a table, the page moves to put that table (and its search row) at the top.
+{ let timer=null, lastPage=0, lastInner=0;
+  const anchorOf=box=>{ const p=box.previousElementSibling; return p&&p.classList.contains("controls")?p:box; };
+  const settle=()=>{ let best=null;
+    for(const el of document.querySelectorAll("#pane-items>.controls,#pane-rates>.controls,#pane-mods .detail>.tablebox")){ if(!el.offsetParent) continue;
+      const d=el.getBoundingClientRect().top-8; if(Math.abs(d)<=160&&Math.abs(d)>1&&(best===null||Math.abs(d)<Math.abs(best))) best=d; }
     if(best!==null) window.scrollBy({top:best,behavior:"smooth"}); };
-  if(window.addEventListener) window.addEventListener("wheel",e=>{ if(e.ctrlKey) return; clearTimeout(timer); timer=setTimeout(settle,170); },{passive:true}); }
+  const onWheel=ev=>{ if(ev.ctrlKey) return; const now=Date.now(); clearTimeout(timer); timer=setTimeout(settle,170);
+    const box=ev.target&&ev.target.closest?ev.target.closest(".tablebox"):null;
+    if(!box||box.classList.contains("inner")||box.scrollHeight<=box.clientHeight+1){ lastPage=now; return; }
+    const dy=ev.deltaMode===1?ev.deltaY*40:(ev.deltaMode===2?ev.deltaY*window.innerHeight:ev.deltaY);
+    if(now-lastPage<350){ ev.preventDefault(); window.scrollBy(0,dy); lastPage=now; return; }
+    const atEnd=dy>0?box.scrollTop+box.clientHeight>=box.scrollHeight-1:box.scrollTop<=0;
+    if(atEnd){ lastPage=now; return; }
+    if(now-lastInner>400){ const d=anchorOf(box).getBoundingClientRect().top-8; if(Math.abs(d)>1) window.scrollBy({top:d,behavior:"smooth"}); }
+    lastInner=now; };
+  if(document.addEventListener) document.addEventListener("wheel",onWheel,{passive:false,capture:true}); }
 const TABS=["setup","items","mods","rates"];
 function setTab(w){ for(const k of TABS){ $("tab-"+k).setAttribute("aria-selected",k===w); $("pane-"+k).hidden=k!==w; } $("ctx").hidden=w==="setup"; if(w==="mods") layoutTree(); }
 $("ctxgo").onclick=()=>setTab("setup");
