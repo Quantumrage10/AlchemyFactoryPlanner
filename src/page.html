@@ -20,13 +20,18 @@
     </div>
     <div class="controls">
       <b class="grp">Your base</b>
+      <label class="inl" for="fuelsel">Fuel <select id="fuelsel" autocomplete="off"></select></label>
+      <label class="inl" for="fertsel">Fertilizer <select id="fertsel" autocomplete="off"></select></label>
+    </div>
+    <div class="controls">
+      <b class="grp"></b>
       <label class="inl" for="tier">Show items up to tier <select id="tier" autocomplete="off"></select></label>
       <span class="inl">Tile size <label for="mL" class="vh">Length</label><input type="number" autocomplete="off" id="mL" min="1" step="1" value="14" style="width:54px"> × <label for="mW" class="vh">Width</label><input type="number" autocomplete="off" id="mW" min="1" step="1" value="14" style="width:54px"> × <label for="mH" class="vh">Height</label><input type="number" autocomplete="off" id="mH" min="1" step="1" value="15" style="width:54px"> <small class="mut">L × W × H</small></span>
       <label class="inl" for="connmax">Bus connections per tile <input type="number" autocomplete="off" id="connmax" min="1" step="1" value="8" style="width:56px"> <small class="mut" id="connnote"></small></label>
     </div>
     <div><b>How the bus line is drawn.</b> A module makes everything it needs inside its own tile, from coins, whenever that fits. Each item then lands in one of four places:</div>
     <ul class="legendlist">
-      <li><span class="st ded">Yes · own wagons</span> A module that needs it can't fit making it, so it gets its own module and its own tagged wagons. Coke powder and advanced fertilizer are always here.</li>
+      <li><span class="st ded">Yes · own wagons</span> A module that needs it can't fit making it, so it gets its own module and its own tagged wagons. The fuel and fertilizer you've picked are always here.</li>
       <li><span class="st mix">Yes · shared wagon</span> Relics. They only go to the shop and to research, so they can all ride one "research" wagon type instead of one each.</li>
       <li><span class="st maybe">Maybe</span> Packed-down items that only one or two things use. They fit inside the module that uses them, or you can give them their own module and bus them. Your call.</li>
       <li><span class="st no">No</span> Bulk, raw, grown or liquid stuff, and things that are only sold. Made right where they're used, or next to the shop.</li>
@@ -109,7 +114,7 @@
         </table></div>
         <div class="mut" id="mtot"></div>
         <div id="notes"></div>
-        <p class="foot">Fuel is coke powder at 660 heat each, plus 10% per Fuel Efficiency level. Faster machines burn fuel faster, so fuel per item stays the same. Nurseries run on advanced fertilizer, which goes further with Fertilizer Efficiency. Alchemy Skill raises what extractors and alembics give. A byproduct the module reuses (like the Athanor's charcoal) is taken off the machine counts first.</p>
+        <p class="foot"><span id="fuelnote"></span> Faster machines burn fuel faster, so fuel per item stays the same. Fertilizer goes further with Fertilizer Efficiency, and Alchemy Skill raises what extractors and alembics give. A byproduct the module reuses (like the Athanor's charcoal) is taken off the machine counts first.</p>
       </div>
     </div>
   </section>

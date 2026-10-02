@@ -15,10 +15,15 @@ $("tier").value=maxTier;
 const SET_IDS=["tier","fe","mL","mW","mH","connmax","lvlbelt","lvlspeed","lvlalch","lvlfert","lvlsell"];
 // Set every setting explicitly: the saved value if there is one, otherwise the default.
 // (Browsers refill form fields by position after a reload, which put old values in the wrong boxes.)
+const SEL_IDS=["fuelsel","fertsel"], SEL_DEFAULT={fuelsel:"Coke Powder",fertsel:"Advanced Fertilizer"};
+{ const fill=(id,names,txt)=>{ for(const n of names){ const o=document.createElement("option"); o.value=n; o.textContent=txt(n); $(id).appendChild(o); } };
+  fill("fuelsel",C.fuelOptions(),n=>n+" ("+I[n].heat.toLocaleString()+" heat)");
+  fill("fertsel",C.fertOptions(),n=>n+" (feeds "+I[n].nutr.toLocaleString()+")"); }
 const SET_DEFAULT={tier:maxTier,fe:0,mL:14,mW:14,mH:15,connmax:8,lvlbelt:0,lvlspeed:0,lvlalch:0,lvlfert:0,lvlsell:0};
 { let sv={}; try{ sv=JSON.parse(localStorage.getItem("bsp_settings_v2")||"{}")||{}; }catch(e){ sv={}; }
+  for(const id of SEL_IDS){ const ok=typeof sv[id]==="string"&&I[sv[id]]&&(id==="fuelsel"?I[sv[id]].heat>0:I[sv[id]].nutr>0); $(id).value=ok?sv[id]:SEL_DEFAULT[id]; }
   for(const id of SET_IDS){ const v=+sv[id]; const ok=sv[id]!=null&&sv[id]!==""&&isFinite(v)&&v>=0&&(id!=="tier"||(v>=1&&v<=maxTier)); $(id).value=ok?sv[id]:SET_DEFAULT[id]; } }
-const saveSettings=()=>{ try{ const o={}; for(const id of SET_IDS) o[id]=$(id).value; localStorage.setItem("bsp_settings_v2",JSON.stringify(o)); }catch(e){} };
+const saveSettings=()=>{ try{ const o={}; for(const id of SET_IDS.concat(SEL_IDS)) o[id]=$(id).value; localStorage.setItem("bsp_settings_v2",JSON.stringify(o)); }catch(e){} };
 const num=(id,def,min)=>Math.max(min,+$(id).value||def);
 const cap=()=>num("mL",14,1)*num("mW",14,1)*num("mH",15,1);
 const dimTxt=()=>num("mL",14,1)+"×"+num("mW",14,1)+"×"+num("mH",15,1);
@@ -35,25 +40,26 @@ function decide(item,to){ if(to===null) delete choice[item]; else choice[item]=t
 // ---------- the bus line for the current tier and tile size ----------
 let LINE=null, lineKey="";
 // upgrades change belt speed and machine speed everywhere
-function applyUpgrades(){ const v=id=>+$(id).value||0; const u=C.setUpgrades(v("lvlbelt"),v("lvlspeed"),v("lvlalch"),v("lvlfert"),v("lvlsell"));
+function applyUpgrades(){ const v=id=>+$(id).value||0; C.setSupplies($("fuelsel").value,$("fertsel").value); const u=C.setUpgrades(v("lvlbelt"),v("lvlspeed"),v("lvlalch"),v("lvlfert"),v("lvlsell"));
   const pct=x=>Math.round(x*100)+"%";
   $("upnote").textContent="Belts carry "+fmt(u.belt)+"/min. Machines run at "+pct(u.speed)+" speed. Extractors and alembics yield "+pct(u.alch)+". Fertilizer feeds "+pct(u.fert)+" as much. Shop prices are "+pct(u.sell)+".";
   $("connnote").textContent="each carries "+fmt(2*u.belt)+"/min (two belts)"; return u; }
 const price=n=>Math.round((I[n].sell||0)*C.sellMult()*10)/10;
-function line(){ const k=tierMax()+"|"+cap()+"|"+C.belt()+"|"+C.speed()+"|"+C.yieldOf({machine:"Extractor"})+"|"+C.fertValue(); if(k!==lineKey){ LINE=C.busLine(tierMax(),cap()); lineKey=k; } return LINE; }
+function line(){ const k=tierMax()+"|"+cap()+"|"+C.belt()+"|"+C.speed()+"|"+C.yieldOf({machine:"Extractor"})+"|"+C.fertValue()+"|"+C.fuel()+"|"+C.fert(); if(k!==lineKey){ LINE=C.busLine(tierMax(),cap()); lineKey=k; } return LINE; }
 // Where an item stands. code: ded (own wagon type), mix (shared research wagon), maybe, no
 function status(n){
   const it=I[n], L=line(); const users=it.uses.filter(inTier); const made=it.kind==="made"&&!it.liq;
   const usesTxt=listAnd(users.slice(0,4))+(users.length>4?" and others":"");
   if(choice[n]==="bus") return {code:"ded",mine:true,why:"Your choice. Every module that needs it takes it off the bus."};
   if(choice[n]==="off") return {code:"no",mine:true,why:"Your choice. Every module that needs it makes its own."+(L.bus.has(n)&&!C.UNIVERSAL.includes(n)?" Check those modules still fit: the "+listAnd((L.forcedBy[n]||[]).slice(0,3))+" module didn't have room for it.":"")};
-  if(n==="Coke Powder") return {code:"ded",why:"Always. It's the fuel for every heated machine, and an ingredient in steel and some potions."};
-  if(n==="Advanced Fertilizer") return {code:"ded",why:"Always. Every nursery in the base runs on it."};
+  if(C.UNIVERSAL.includes(n)){ const isFuel=n===C.fuel(), isFert=n===C.fert();
+    return {code:"ded",why:"Always. It's "+(isFuel&&isFert?"the fuel and the fertilizer":isFuel?"the fuel":"the fertilizer")+" you've picked for "+(isFuel&&isFert?"the whole base":isFuel?"every heated machine":"every nursery")+"."+(users.length?" "+usesTxt+" also use"+(users.length>1?"":"s")+" it as an ingredient.":"")}; }
   if(it.relic) return {code:"mix",why:"A relic. It only goes to the shop and to research, so it rides one shared \"research\" wagon type with the other relics."+(users.length?" "+usesTxt+" also take"+(users.length>1?"":"s")+" it off that wagon.":"")};
   if(L.bus.has(n)){ const fb=L.forcedBy[n]||[]; return {code:"ded",why:"The "+listAnd(fb.slice(0,3))+" module"+(fb.length>1?"s":"")+" can't fit making "+(fb.length>1?"their":"its")+" own "+n.toLowerCase()+" in one tile."}; }
   if(it.liq) return {code:"no",why:"Hard no. A liquid, piped inside whatever uses it."};
   if(it.kind==="raw") return {code:"no",why:"Hard no. Bought with coins inside whatever uses it."};
   if(it.kind==="crop") return {code:"no",why:"Hard no. Grown in nurseries inside whatever uses it."};
+  if(C.onlyFeedsConversion(n)){ const into=it.uses[0]; return {code:"no",why:"No. It only ever gets turned into "+into+", so it's made inside the "+into.toLowerCase()+" module and the "+into.toLowerCase()+" is what moves."+(it.sell?" The shop's share gets made next to the shop.":"")}; }
   { const src=C.simpleFrom(n); if(src&&inTier(src)){ if(onBus(src)) return {code:"no",why:"No. It's a straight one-for-one conversion of "+src+" in a single "+R[n].machine+". "+src+" is what rides the bus, and you convert it right where it's needed"+(it.sell?", including next to the shop":"")+"."};
       return {code:"no",why:"No. It's a straight one-for-one conversion of "+src+" in a single "+R[n].machine+". Whatever module needs it grinds its own from the "+src.toLowerCase()+" it already has"+(it.sell?". The shop's share gets made next to the shop.":".")}; } }
   if(!it.dense) return {code:"no",why:"Hard no. Bulk ("+it.rtxt+"). Make it right where it's used."+(it.sell?" The shop's share gets made next to the shop.":"")};
@@ -125,11 +131,12 @@ $("modsel").onchange=e=>openMod(e.target.value);
 function sizing(root,cs){
   const one=C.solve(root,1,cs);
   // bus connections: each item coming off or going onto the bus needs a station, and a station carries CONN items a minute
-  const selfFuel=root==="Coke Powder", selfFert=root==="Advanced Fertilizer";
+  const FUELN=C.fuel(), FERTN=C.fert(), fuelRaw=I[FUELN].kind==="raw";
+  const selfFuel=root===FUELN, selfFert=root===FERTN;
   const CONN=2*C.belt(), connMax=num("connmax",8,1), fuel1=C.fuelPerMin(one,fe());
   const perUnit={}; for(const k in one.busIn) if(one.busIn[k]>1e-12) perUnit[k]=one.busIn[k];
-  if(!selfFuel&&fuel1>1e-12) perUnit["Coke Powder"]=(perUnit["Coke Powder"]||0)+fuel1;
-  if(!selfFert&&one.fert>1e-12) perUnit["Advanced Fertilizer"]=(perUnit["Advanced Fertilizer"]||0)+one.fert;
+  if(!selfFuel&&!fuelRaw&&fuel1>1e-12) perUnit[FUELN]=(perUnit[FUELN]||0)+fuel1;
+  if(!selfFert&&one.fert>1e-12) perUnit[FERTN]=(perUnit[FERTN]||0)+one.fert;
   const outUnit=Math.max(0,1-(selfFuel?fuel1:0)-(selfFert?one.fert:0));
   const stations=f=>f>1e-9?Math.ceil(f/CONN-1e-9):0;
   const connAt=r=>{ let c=stations(outUnit*r); for(const k in perUnit) c+=stations(perUnit[k]*r); return c; };
@@ -154,7 +161,7 @@ function sizing(root,cs){
   addRow(best(tightC), "Tight squeeze");
   addRow(best(overC.filter(c=>c.r<=overC[0].r*1.3),true), "First size that won't fit");
   const pick=[...pickMap.values()].sort((a,b)=>a[0].r-b[0].r);
-  return {one,selfFuel,selfFert,CONN,connMax,fuel1,perUnit,outUnit,stations,connAt,block,step,cp,fillAt,evenness,cand,pick,fitC,tightC,overC,round};
+  return {one,selfFuel,selfFert,FUELN,FERTN,fuelRaw,CONN,connMax,fuel1,perUnit,outUnit,stations,connAt,block,step,cp,fillAt,evenness,cand,pick,fitC,tightC,overC,round};
 }
 // Opens a module at the biggest size that fits its tile with every machine count whole;
 // failing that the biggest that fits at all, then the smallest tight squeeze, then one machine.
@@ -169,7 +176,7 @@ function chain(root,cs){ const seen=new Set(), out=[];
 function renderMod(){
   if(!cur) return; const root=cur, rate=Math.max(0,+$("rate").value||0), cs=cuts(root), L=line();
   const sol=C.solve(root,rate,cs);
-  const {one,selfFuel,selfFert,CONN,connMax,fuel1,perUnit,outUnit,stations,connAt,block,step,cp,fillAt,evenness,cand,pick,fitC,tightC,overC,round}=sizing(root,cs);
+  const {one,selfFuel,selfFert,FUELN,FERTN,fuelRaw,CONN,connMax,fuel1,perUnit,outUnit,stations,connAt,block,step,cp,fillAt,evenness,cand,pick,fitC,tightC,overC,round}=sizing(root,cs);
   $("mname").textContent=root;
   const it=I[root], st=status(root); const users=it.uses.filter(inTier);
   const ends=[...users, it.relic?"research":"", it.sell?"the shop":""].filter(Boolean);
@@ -200,12 +207,15 @@ function renderMod(){
   const fuel=C.fuelPerMin(sol,fe());
   let bus=""; const busItems=Object.entries(sol.busIn).filter(([,v])=>v>1e-9).sort((a,b)=>b[1]-a[1]);
   for(const [k,v] of busItems) bus+=rowKV(esc(k),fmt(v)+"/min","ingredient");
-  if(fuel>1e-9&&!selfFuel) bus+=rowKV("Coke Powder",fmt(fuel)+"/min","fuel for the heated machines");
-  if(sol.fert>1e-9&&!selfFert) bus+=rowKV("Advanced Fertilizer",fmt(sol.fert)+"/min","for the nurseries");
-  const busTotal=busItems.reduce((a,[,v])=>a+v,0)+(selfFuel?0:fuel)+(selfFert?0:sol.fert);
+  if(fuel>1e-9&&!selfFuel&&!fuelRaw) bus+=rowKV(esc(FUELN),fmt(fuel)+"/min","fuel for the heated machines");
+  if(sol.fert>1e-9&&!selfFert) bus+=rowKV(esc(FERTN),fmt(sol.fert)+"/min","for the nurseries");
+  const busTotal=busItems.reduce((a,[,v])=>a+v,0)+((selfFuel||fuelRaw)?0:fuel)+(selfFert?0:sol.fert);
   $("busin").innerHTML=(bus||`<div class="empty">Nothing. This module runs on coins alone.</div>`)+(bus?`<div class="row tot"><span>Total off the bus</span><span>${fmt(busTotal)}/min</span></div>`:"");
   let coins=""; for(const [k,v] of Object.entries(sol.coins).sort((a,b)=>b[1]*I[b[0]].buy-a[1]*I[a[0]].buy)) coins+=rowKV(esc(k),fmt(v)+"/min",fmt(v*I[k].buy)+" copper/min");
-  $("coins").innerHTML=(coins||`<div class="empty">No coins needed.</div>`)+(coins?`<div class="row tot"><span>Total coins</span><span>${fmt(sol.copper)} copper/min</span></div>`:"");
+  const fuelCopper=(fuelRaw&&fuel>1e-9)?fuel*I[FUELN].buy:0;
+  if(fuelCopper>0) coins+=rowKV(esc(FUELN)+" (fuel)",fmt(fuel)+"/min",fmt(fuelCopper)+" copper/min");
+  $("coins").innerHTML=(coins||`<div class="empty">No coins needed.</div>`)+(coins?`<div class="row tot"><span>Total coins</span><span>${fmt(sol.copper+fuelCopper)} copper/min</span></div>`:"");
+  $("fuelnote").textContent="Fuel is "+FUELN+" at "+I[FUELN].heat.toLocaleString()+" heat each, plus 10% per Fuel Efficiency level. Nurseries are fed "+FERTN+".";
   let outp=rowKV(esc(root)+" made",fmt(rate)+"/min");
   if(selfFuel&&fuel>1e-9){ outp+=rowKV("Burned as its own fuel","−"+fmt(fuel)+"/min"); outp+=`<div class="row tot"><span>Leaves the module</span><span>${fmt(rate-fuel)}/min</span></div>`; }
   else if(selfFert&&sol.fert>1e-9){ outp+=rowKV("Fed to its own nurseries","−"+fmt(sol.fert)+"/min"); outp+=`<div class="row tot"><span>Leaves the module</span><span>${fmt(rate-sol.fert)}/min</span></div>`; }
@@ -253,7 +263,7 @@ function renderRates(){
   const q=$("rq").value.trim().toLowerCase(); const seen=new Set(); const rows=[];
   for(const n of Object.keys(I).sort((a,b)=>I[a].tier-I[b].tier||a.localeCompare(b))){ const r=R[n]; if(!r||I[n].kind==="raw"||seen.has(r.id)||!inTier(n)) continue; seen.add(r.id);
     const main=Object.keys(r.outs)[0]; const x=C.rate(r,main); const y=C.yieldOf(r); const crafts=x.per/(r.outs[main]*y);
-    const ins=Object.entries(r.ins).map(([k,v])=>fmt(v*crafts)+" "+k).join(" + ")||(I[n].kind==="crop"?fmt(crafts*r.nut/C.fertValue())+" Advanced Fertilizer":"—");
+    const ins=Object.entries(r.ins).map(([k,v])=>fmt(v*crafts)+" "+k).join(" + ")||(I[n].kind==="crop"?fmt(crafts*r.nut/C.fertValue())+" "+C.fert():"—");
     const outs=Object.entries(r.outs).map(([k,v])=>fmt(v*y*crafts)+" "+k).join(" + ");
     const txt=(main+" "+r.machine+" "+ins).toLowerCase(); if(q&&!txt.includes(q)) continue;
     rows.push(`<tr><td class="name">${esc(main)}</td><td>${esc(r.machine)}</td><td>${esc(ins)}</td><td>${esc(outs)}</td><td class="num">${r.heat?fmt(r.heat):""}</td><td class="why">${x.capped?"Capped at one belt ("+fmt(C.belt())+"/min). The recipe alone would be faster.":""}</td><td class="num">${I[n].tier}</td></tr>`); }
@@ -265,6 +275,7 @@ $("rq").oninput=renderRates;
 function redrawAll(){ saveSettings(); applyUpgrades(); line(); if(cur&&!inTier(cur)) cur=modNames()[0]||null; { const ks=Object.keys(choice).filter(k=>I[k]); $("choices").hidden=!ks.length;
     $("choicelist").innerHTML=ks.map(k=>`<span class="chip pick">${esc(k)}: ${choice[k]==="bus"?"on the bus":"kept off the bus"} <button class="x" data-item="${esc(k)}" aria-label="Undo ${esc(k)}">×</button></span>`).join(""); } renderItems(); renderList(); renderMod(); renderRates(); }
 for(const id of ["tier","fe","connmax","lvlbelt","lvlspeed","lvlalch","lvlfert","lvlsell"]) $(id).oninput=redrawAll;
+for(const id of SEL_IDS) $(id).onchange=redrawAll;
 for(const d of ["mL","mW","mH"]){ const a=$(d), b=$(d+"2"); b.value=a.value; a.oninput=()=>{ b.value=a.value; redrawAll(); }; b.oninput=()=>{ a.value=b.value; redrawAll(); }; }
 $("tier").onchange=redrawAll;
 applyUpgrades(); line();

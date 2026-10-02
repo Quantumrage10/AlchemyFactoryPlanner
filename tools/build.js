@@ -23,7 +23,7 @@ const mk = id => ({ id, value: '', innerHTML: '', textContent: '', hidden: false
   setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k]; },
   addEventListener() {}, appendChild(c) { this.children.push(c); }, closest() { return null; } });
 const doc = { getElementById: id => els[id] || (els[id] = mk(id)), createElement: () => mk('_'), querySelectorAll: () => [] };
-const init = { fe: '0', mL: '14', mW: '14', mH: '15', connmax: '8', lvlbelt: '0', lvlspeed: '14', lvlalch: '0', lvlfert: '0', lvlsell: '0' };
+const init = { fe: '0', mL: '14', mW: '14', mH: '15', connmax: '8', lvlbelt: '0', lvlspeed: '14', lvlalch: '0', lvlfert: '0', lvlsell: '0', fuelsel: 'Coke Powder', fertsel: 'Advanced Fertilizer' };
 for (const k in init) doc.getElementById(k).value = init[k];
 const store = {};
 const ls = { getItem: k => store[k] || null, setItem: (k, v) => { store[k] = v; } };
@@ -62,6 +62,22 @@ doc.getElementById('lvlfert').value = '0'; doc.getElementById('lvlfert').oninput
 doc.getElementById('lvlsell').value = '1'; doc.getElementById('lvlsell').oninput();
 must(/87\.5/.test(strip(els.rows.innerHTML)), 'sales ability did not raise prices by 25%');
 doc.getElementById('lvlsell').value = '0'; doc.getElementById('lvlsell').oninput();
+// a different fuel: blast potion is far hotter than coke powder, so a glass module needs far less of it
+api.openMod('Glass');
+must(/Coke Powder/.test(strip(els.busin.innerHTML)), 'glass should burn coke powder by default');
+doc.getElementById('fuelsel').value = 'Blast Potion'; doc.getElementById('fuelsel').onchange();
+api.openMod('Glass');
+must(/Blast Potion/.test(strip(els.busin.innerHTML)) && !/Coke Powder/.test(strip(els.busin.innerHTML)), 'changing the fuel did not change what glass burns: ' + strip(els.busin.innerHTML));
+must(api.status('Blast Potion').code === 'ded' && /fuel you've picked/.test(api.status('Blast Potion').why), 'the chosen fuel should be the one that is always on the bus');
+must(!/fuel you've picked/.test(api.status('Coke Powder').why), 'coke powder should stop being the always-on fuel once another fuel is picked');
+// with another fuel picked, coke powder is an ordinary item: it must be the powder that ships, never coke
+must(api.status('Coke').code === 'no', 'coke should never be put on the bus: ' + api.status('Coke').why);
+must(api.status('Coke Powder').code !== 'no', 'coke powder should be what ships, not coke: ' + api.status('Coke Powder').why);
+api.openMod('Steel Ingot');
+must(/Coke Powder/.test(strip(els.busin.innerHTML)) && !/Coke [^P]/.test(strip(els.busin.innerHTML)), 'steel should take coke powder off the bus, not coke: ' + strip(els.busin.innerHTML));
+// steel ingot has other uses, so it still ships and gears are made on site
+must(api.status('Steel Ingot').code === 'ded' && api.status('Steel Gear').code === 'no', 'steel ingot should ship and steel gears be made on site');
+doc.getElementById('fuelsel').value = 'Coke Powder'; doc.getElementById('fuelsel').onchange();
 
 if (process.argv.includes('--fragment')) {
   fs.mkdirSync(path.join(root, 'dist'), { recursive: true });

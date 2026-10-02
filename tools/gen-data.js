@@ -39,6 +39,7 @@ for (const [n, it] of Object.entries(SI)) {
   if (!r) continue;
   items[n] = {
     tier: it.tier || 0, sell: it.sellPrice || 0, buy: it.buyPrice || 0, liq: !!it.liquid, kind: kindOf(n), cat: it.category,
+    heat: it.heat || 0, nutr: it.nutrientValue || 0, fspeed: it.maxFertility || 0,
     uses: [...(users[n] || [])].filter(x => SI[x] && !SI[x].virtual && SI[x].category !== 'Currency'),
   };
   const t = (r.machine === 'Nursery' && r.nutrientCost) ? r.nutrientCost / FERT_SPEED : (r.baseTime || 1);
