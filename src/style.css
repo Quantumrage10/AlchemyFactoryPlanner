@@ -384,3 +384,11 @@ svg.bytext text.hl{fill:var(--copper);font-size:14px}
 .focusbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--verd-soft);border:1px solid color-mix(in srgb,var(--verd) 40%,transparent);border-radius:6px;padding:8px 12px;font-size:14px}
 .focusbar[hidden]{display:none}
 .focusbar .resetbtn{margin-left:auto}
+/* line thickness follows --lw, which the script raises as the tree is zoomed out */
+.kids>.branch::after{height:var(--lw,2px);margin-top:calc(var(--a,30px) - 11px - var(--lw,2px)/2)}
+.kids>.branch::before{border-right-width:var(--lw,2px)}
+.kids>.branch:first-child::before{top:calc(var(--a,30px) - var(--lw,2px)/2)}
+.kids>.branch:last-child::before{bottom:calc(100% - var(--a,30px) - var(--lw,2px)/2)}
+.stub{height:var(--lw,2px)}
+svg.bylines>path.vis{stroke-width:var(--lw,2px)}
+svg.bylines>path.vis.hl{stroke-width:calc(var(--lw,2px)*1.75)}

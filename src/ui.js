@@ -291,6 +291,8 @@ function placeTree(reset){ const flow=$("ingr"), zw=flow.firstElementChild; if(!
   // the tree goes exactly where zooming and dragging put it; the only limit is that a good piece of it stays in the window
   const w=W0*treeZoom, h=H0*treeZoom, hold=(v,size,room)=>Math.min(room-Math.min(120,room/3),Math.max(Math.min(120,room/3)-size,v));
   treeX=hold(treeX,w,cw); treeY=hold(treeY,h,ch);
+  // lines get thicker as the tree is zoomed out, so on screen they never fall below about a pixel and a half
+  zw.style.setProperty("--lw",Math.max(2,1.5/treeZoom).toFixed(2)+"px");
   zw.style.transform=treeTf(); }
 // As soon as you start working with the tree (pressing on it, or zooming it) the page slides so the whole tree window is
 // on screen. Plain scrolling past it is left alone.
