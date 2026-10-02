@@ -333,3 +333,5 @@ html{scroll-snap-type:y proximity}
 #pane-items>.tablebox,#pane-rates>.tablebox{scroll-snap-align:none}
 #pane-items>.tablebox{max-height:calc(min(100vh - 16px,var(--tableh,860px)) - 120px)}
 #pane-rates>.tablebox{max-height:calc(min(100vh - 16px,var(--tableh,860px)) - 64px)}
+/* the catch is done by the script after a wheel scroll, not by the browser, so clicks never move the page */
+html{scroll-snap-type:none}

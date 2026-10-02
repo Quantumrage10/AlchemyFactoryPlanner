@@ -173,6 +173,13 @@ function renderBoard(){ const made=modNames(), st={}; for(const n of made) st[n]
       +`<div class="addrow"><input type="search" class="addto" id="add-${id}" data-tag="${id}" autocomplete="off" placeholder="Add an item" aria-label="Add an item to this wagon"><nav class="modlist droplist" id="addlist-${id}" aria-label="Items to add" hidden></nav></div></div>`; }).join(""); }
 
 // ---------- tabs ----------
+// The catch: when you stop scrolling with the wheel close to a long table (or its search row), the page settles with it
+// at the top of the window. It only ever follows a wheel scroll, so clicking a tab or a button never moves the page.
+{ let timer=null; const settle=()=>{ let best=null;
+    for(const e of document.querySelectorAll("#pane-items>.controls,#pane-rates>.controls,#pane-mods .detail>.tablebox")){ if(!e.offsetParent) continue;
+      const d=e.getBoundingClientRect().top-8; if(Math.abs(d)<=110&&Math.abs(d)>1&&(best===null||Math.abs(d)<Math.abs(best))) best=d; }
+    if(best!==null) window.scrollBy({top:best,behavior:"smooth"}); };
+  if(window.addEventListener) window.addEventListener("wheel",e=>{ if(e.ctrlKey) return; clearTimeout(timer); timer=setTimeout(settle,170); },{passive:true}); }
 const TABS=["setup","items","mods","rates"];
 function setTab(w){ for(const k of TABS){ $("tab-"+k).setAttribute("aria-selected",k===w); $("pane-"+k).hidden=k!==w; } $("ctx").hidden=w==="setup"; if(w==="mods") layoutTree(); }
 $("ctxgo").onclick=()=>setTab("setup");
