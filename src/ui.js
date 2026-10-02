@@ -273,7 +273,7 @@ function applyFocus(){ const bar=$("treefocus"), zw=$("ingr").firstElementChild;
   const all=Array.from(zw.querySelectorAll(".node")), nd=all.find(e=>e.dataset.id===String(treeFocus.id)&&e.dataset.n===treeFocus.n);
   if(!nd){ treeFocus=null; bar.hidden=true; return; }
   const F=nd.parentElement, inside=new Set(Array.from(F.querySelectorAll(".node")).map(e=>e.dataset.id)), keep=[], extra=[];
-  for(const a of byArrows){ if(!inside.has(String(a.to))) continue; const pe=a.self?null:all.find(e=>e.dataset.n===a.from);
+  for(const a of byArrows){ if(!inside.has(String(a.to))) continue; const pe=a.self?null:(a.fromId!=null&&all.find(e=>e.dataset.id===String(a.fromId)))||all.find(e=>e.dataset.n===a.from);
     if(a.self||(pe&&inside.has(pe.dataset.id))) keep.push(a); else extra.push(a); }
   const top=F.cloneNode(true); top.className="branch";
   zw.innerHTML=top.outerHTML+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg>';
@@ -354,7 +354,7 @@ $("treereset").onclick=()=>{ treeFresh=true; layoutTree(); };
       if((Math.abs(e.clientY-y)<=7&&e.clientX>=nr-1)||e.clientX>=r.right-8*treeZoom) return {kind:"feed",branch:t.parentElement.parentElement}; }
     return null; };
   const keyOf=h=>!h?"":h.kind==="by"?"by"+h.i:"feed"+nodeOf(h.branch).dataset.id;
-  const byEnds=a=>{ const nodes=Array.from(flow.querySelectorAll(".node")), te=nodes.find(e=>e.dataset.id===String(a.to)); return {te,pe:a.self?te:nodes.find(e=>e.dataset.n===a.from)}; };
+  const byEnds=a=>{ const nodes=Array.from(flow.querySelectorAll(".node")), te=nodes.find(e=>e.dataset.id===String(a.to)); return {te,pe:a.self?te:(a.fromId!=null&&nodes.find(e=>e.dataset.id===String(a.fromId)))||nodes.find(e=>e.dataset.n===a.from)}; };
   const mark=h=>{ clear(); if(!h) return; flow.classList.add("online");
     if(h.kind==="feed"){ h.branch.classList.add("hl"); return; }
     const a=byArrows[h.i]; if(!a) return; const {te,pe}=byEnds(a); if(te) te.classList.add("hl"); if(pe) pe.classList.add("hl");
@@ -393,22 +393,37 @@ function drawBy(){ const flow=$("ingr"), svg=flow.querySelector("svg.bylines"), 
   for(const s of [svg,txt]){ s.setAttribute("width",W); s.setAttribute("height",H); s.setAttribute("viewBox","0 0 "+W+" "+H); }
   const nodes=Array.from(flow.querySelectorAll(".node")); const box=e=>{ const r=e.getBoundingClientRect(); return {l:(r.left-fr.left)/Z,t:(r.top-fr.top)/Z,w:r.width/Z,h:r.height/Z}; };
   let lines='<defs><marker id="byhead" markerWidth="10" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L10 6L0 12Z" fill="currentColor"/></marker></defs>', labels="";
-  const used={}, usedIn={}, hs=[], vs=[];
+  const used={}, usedIn={}, hs=[], vs=[], placed=[], allBoxes=nodes.map(box);
   // every stretch of line is checked against the ones already drawn and nudged aside until it has a lane to itself
   const freeY=(y,x1,x2,step)=>{ const lo=Math.min(x1,x2), hi=Math.max(x1,x2); for(let g=0;g<16&&hs.some(q=>Math.abs(q.y-y)<9&&q.lo<hi&&q.hi>lo);g++) y+=step; hs.push({y,lo,hi}); return y; };
   const freeX=(x,y1,y2,step)=>{ const lo=Math.min(y1,y2), hi=Math.max(y1,y2); for(let g=0;g<16&&vs.some(q=>Math.abs(q.x-x)<9&&q.lo<hi&&q.hi>lo);g++) x+=step; vs.push({x,lo,hi}); return x; };
-  for(const a of byArrows){ const te=nodes.find(e=>e.dataset.id===String(a.to)), pe=a.self?te:nodes.find(e=>e.dataset.n===a.from); if(!pe||!te) continue; const p=box(pe), t=box(te);
-    const kt=usedIn[a.to]=(usedIn[a.to]||0)+1, k=used[a.from]=(used[a.from]||0)+1, ol=Math.max(p.l,t.l), or=Math.min(p.l+p.w,t.l+t.w); let d, lx, ly;
+  for(const a of byArrows){ const te=nodes.find(e=>e.dataset.id===String(a.to)), pe=a.self?te:(a.fromId!=null&&nodes.find(e=>e.dataset.id===String(a.fromId)))||nodes.find(e=>e.dataset.n===a.from); if(!pe||!te) continue; const p=box(pe), t=box(te);
+    const kt=usedIn[a.to]=(usedIn[a.to]||0)+1, k=used[a.fromId!=null?"#"+a.fromId:a.from]=(used[a.fromId!=null?"#"+a.fromId:a.from]||0)+1, ol=Math.max(p.l,t.l), or=Math.min(p.l+p.w,t.l+t.w); let pts;
     const above=t.t+t.h<=p.t-14, below=t.t>=p.t+p.h+14, pcx=Math.round(p.l+p.w/2+10*(k-1)), tcx=Math.round(t.l+t.w/2-10*(kt-1));
     if(pe!==te&&(above||below)&&or-ol>=30){
       // one box sits over the other: straight up or straight down, label halfway along
       const y0=Math.round(above?p.t:p.t+p.h), y1=Math.round(above?t.t+t.h+1:t.t-1), x=freeX(Math.round((ol+or)/2),y0,y1,10);
-      d="M"+x+" "+y0+"V"+y1; lx=x; ly=Math.round((y0+y1)/2)+4; }
+      pts=[[x,y0],[x,y1]]; }
     else if(pe!==te&&(above||below)){
-      // a row above or below: out of the bottom (or top), across in the gap beside the box that uses it, into its top (or bottom)
+      // A row above or below. There are three sensible ways round; each is checked against every other box and the one
+      // that passes behind the fewest boxes wins, then the one with the fewest turns:
+      //   near: out of the top or bottom, turn in the gap right next to the box it comes from, then straight in
+      //   far:  out of the top or bottom, straight across the rows, turn in the gap next to the box that uses it
+      //   side: straight out of the side of the box it comes from, one turn, straight in
       const y0=Math.round(above?p.t:p.t+p.h), y1=Math.round(above?t.t+t.h+1:t.t-1);
-      const lane=freeY(Math.round(above?t.t+t.h+18:t.t-18),pcx,tcx,above?10:-10), px=freeX(pcx,y0,lane,10), tx=freeX(tcx,lane,y1,-10);
-      d="M"+px+" "+y0+"V"+lane+"H"+tx+"V"+y1; lx=Math.round((px+tx)/2); ly=lane+4; }
+      const others=nodes.filter(el=>el!==pe&&el!==te).map(box);
+      const hits=pts=>{ let n=0; for(let i=1;i<pts.length;i++){ const x1=Math.min(pts[i-1][0],pts[i][0]), x2=Math.max(pts[i-1][0],pts[i][0]), ya=Math.min(pts[i-1][1],pts[i][1]), yb=Math.max(pts[i-1][1],pts[i][1]);
+          for(const o of others) if(x1<o.l+o.w-2&&x2>o.l+2&&ya<o.t+o.h-2&&yb>o.t+2) n++; } return n; };
+      const laneT=Math.round(above?t.t+t.h+18:t.t-18), laneP=Math.round(above?p.t-18:p.t+p.h+18), sy=Math.round(above?p.t+p.h*0.3:p.t+p.h*0.7);
+      const sx=tcx>p.l+p.w+12?Math.round(p.l+p.w):(tcx<p.l-12?Math.round(p.l):null);
+      const ways=[{k:"near",pts:[[pcx,y0],[pcx,laneP],[tcx,laneP],[tcx,y1]],turns:2},{k:"far",pts:[[pcx,y0],[pcx,laneT],[tcx,laneT],[tcx,y1]],turns:2}];
+      if(sx!==null) ways.push({k:"side",pts:[[sx,sy],[tcx,sy],[tcx,y1]],turns:1});
+      for(const w of ways) w.cost=hits(w.pts)*1000+w.turns;
+      const way=ways.reduce((m,w)=>w.cost<m.cost?w:m);
+      if(way.k==="side"){ const tx=freeX(tcx,sy,y1,-10), yy=freeY(sy,sx,tx,above?-9:9);
+        pts=[[sx,yy],[tx,yy],[tx,y1]]; }
+      else { const lane=freeY(way.k==="near"?laneP:laneT,pcx,tcx,(way.k==="near")===above?-10:10), px=freeX(pcx,y0,lane,10), tx=freeX(tcx,lane,y1,-10);
+        pts=[[px,y0],[px,lane],[tx,lane],[tx,y1]]; } }
     else {
       // the same row: the line goes over the top, clear of every box it passes
       let over=Math.min(p.t,t.t); { const xl=Math.min(p.l,t.l), xr=Math.max(p.l+p.w,t.l+t.w), yb=Math.max(p.t+p.h,t.t+t.h);
@@ -416,15 +431,24 @@ function drawBy(){ const flow=$("ingr"), svg=flow.querySelector("svg.bylines"), 
       if(pe!==te){
         // two different boxes: up out of the top, across, down into the top
         const lane=freeY(Math.round(over-18),pcx,tcx,-10), px=freeX(pcx,lane,p.t,10), tx=freeX(tcx,lane,t.t,-10);
-        d="M"+px+" "+Math.round(p.t)+"V"+lane+"H"+tx+"V"+Math.round(t.t-1); lx=Math.round((px+tx)/2); ly=lane+4; }
+        pts=[[px,Math.round(p.t)],[px,lane],[tx,lane],[tx,Math.round(t.t-1)]]; }
       else {
         // a box feeding itself: out of its right side, over its top, and into its own front, above the main line
         const x0=Math.round(p.l+p.w), x1=Math.round(p.l)-1, side=Math.round(p.t+p.h*0.3);
         const lane=freeY(Math.round(p.t-12),x1-14,x0+10,-10), xa=freeX(x0+10,lane,side,7), xb=Math.max(3,freeX(x1-13,lane,side,-7));
-        d="M"+x0+" "+side+"H"+xa+"V"+lane+"H"+xb+"V"+side+"H"+x1; lx=Math.round((xa+xb)/2); ly=lane+4; } }
+        pts=[[x0,side],[xa,side],[xa,lane],[xb,lane],[xb,side],[x1,side]]; } }
+    // The label goes on the line, at the first spot along it that is clear of every box and of the labels already placed:
+    // the middle of the longest stretch first, then a quarter and three quarters along, then the shorter stretches.
+    const d="M"+pts.map(q=>q[0]+" "+q[1]).join("L"), txt=a.item+" "+fmt(a.amt)+"/min", lw=txt.length*6.8+10, lh=18;
+    const segsOf=pts.slice(1).map((q,i)=>({a:pts[i],b:q,len:Math.abs(q[0]-pts[i][0])+Math.abs(q[1]-pts[i][1])})).sort((u,v)=>v.len-u.len);
+    const clear=(x,y)=>{ const l=x-lw/2, r=x+lw/2, tp=y-lh/2, bt=y+lh/2;
+      return !allBoxes.some(o=>l<o.l+o.w&&r>o.l&&tp<o.t+o.h&&bt>o.t)&&!placed.some(o=>l<o.r&&r>o.l&&tp<o.b&&bt>o.t); };
+    let lx=null, ly=null; for(const g of segsOf){ for(const f of [0.5,0.25,0.75,0.12,0.88]){ const x=g.a[0]+(g.b[0]-g.a[0])*f, y=g.a[1]+(g.b[1]-g.a[1])*f; if(clear(x,y)){ lx=x; ly=y; break; } } if(lx!==null) break; }
+    if(lx===null){ const g=segsOf[0]; lx=(g.a[0]+g.b[0])/2; ly=(g.a[1]+g.b[1])/2; }
+    placed.push({l:lx-lw/2,r:lx+lw/2,t:ly-lh/2,b:ly+lh/2}); lx=Math.round(lx); ly=Math.round(ly)+4;
     const bi=byArrows.indexOf(a);
     lines+='<path class="vis" data-i="'+bi+'" d="'+d+'" marker-end="url(#byhead)"/><path class="hit" data-i="'+bi+'" d="'+d+'"/>';
-    labels+='<text data-i="'+bi+'" x="'+lx+'" y="'+ly+'" text-anchor="middle">'+esc(a.item)+' '+fmt(a.amt)+'/min</text>'; }
+    labels+='<text data-i="'+bi+'" x="'+lx+'" y="'+ly+'" text-anchor="middle">'+esc(txt)+'</text>'; }
   svg.innerHTML=lines; txt.innerHTML=labels; }
 function layoutTree(){ const zw=$("ingr").firstElementChild, top=zw&&zw.firstElementChild; if(!top||!top.getBoundingClientRect||$("pane-mods").hidden) return;
   if(treeFresh){ treeZoom=1; treeX=0; treeY=0; zw.style.transform="none"; } const Z=treeZoom;
@@ -432,7 +456,7 @@ function layoutTree(){ const zw=$("ingr").firstElementChild, top=zw&&zw.firstEle
   { const nodes=Array.from($("ingr").querySelectorAll(".node"));
     // A box fed only by a byproduct slides right to sit directly under or over the machine that byproduct comes out of,
     // taking the rest of its run of boxes with it, wherever its row has the room. The arrow is then a straight line.
-    for(const a of byArrows){ if(a.self) continue; const pe=nodes.find(e=>e.dataset.n===a.from), te=nodes.find(e=>e.dataset.id===String(a.to)); if(!pe||!te) continue;
+    for(const a of byArrows){ if(a.self) continue; const pe=(a.fromId!=null&&nodes.find(e=>e.dataset.id===String(a.fromId)))||nodes.find(e=>e.dataset.n===a.from), te=nodes.find(e=>e.dataset.id===String(a.to)); if(!pe||!te) continue;
       let br=te.parentElement; if(!br.classList.contains("tail")) continue;
       while(br.parentElement&&br.parentElement.classList.contains("kids")&&br.parentElement.children.length===1&&br.parentElement.parentElement.classList.contains("branch")) br=br.parentElement.parentElement;
       let used=0; for(const c of br.children) used+=c.getBoundingClientRect().width;
@@ -520,27 +544,31 @@ function renderMod(){
     return '<div class="node '+cls+(eye?' haseye':'')+'" data-id="'+id+'" data-n="'+esc(n)+'"><div><b>'+esc(n)+'</b> <span class="amt">'+fmt(amt)+'/min</span></div><div>'+src+mark+'</div>'+act+(eye?'<button class="eye" data-eye="'+id+'" data-n="'+esc(n)+'" title="Show only what goes into '+esc(n)+'" aria-label="Show only what goes into '+esc(n)+'">'+EYE+'</button>':"")+'</div>'; };
   // a tree, read left to right: every item sits to the right of what goes into it, joined by lines, and the
   // finished item is at the far right. Something used in several places shows up in each, with the amount that place needs.
-  byArrows=[]; let nid=0;
-  // A byproduct goes back into the machine it came out of before anything else (the steel Athanor's spare iron ingots feed
-  // the steel Athanor). Only what is left after that is shared out to other things that use the same item.
-  // back: of every one of the item a machine takes in, how much it gives straight back (the steel Athanor returns 3 of
-  // every 4 iron ingots). rest: what is left of the byproduct, across the whole module, for anything else that uses it.
-  const pools={}; const poolOf=(n,from)=>pools[n]||(pools[n]=(()=>{ const pr=R[from], y=C.yieldOf(pr);
-    const back=pr.ins[n]?Math.min(1,pr.outs[n]*y/pr.ins[n]):0, taken=(sol.flows[from]||0)/(pr.outs[from]*y)*(pr.ins[n]||0)*back;
-    return {back,rest:Math.max(0,sol.recycled[n]-Math.min(sol.recycled[n],taken))}; })());
-  const tree=(n,q,d,parent,pn)=>{ const isRoot=d===0, r=R[n], cut=!isRoot&&cs.has(n), id=++nid;
-    let by=null; if(!isRoot&&!cut&&sol.recycled[n]>1e-9&&sol.flows[n]>1e-9){ const from=Object.keys(sol.flows).find(p=>p!==n&&R[p]&&R[p].outs[n]!=null&&I[p].kind!=="raw");
-      if(from){ const pool=poolOf(n,from), self=pn===from, take=self?q*pool.back:Math.min(q,pool.rest); if(!self) pool.rest-=take;
-        // the arrow always points at the thing that uses the byproduct; the item's own box shows only what still has to be made
-        if(take>1e-6){ by={amt:take,from,full:take>=q-1e-6}; byArrows.push({from,item:n,amt:take,to:parent,self:pn===from}); if(by.full){ nid--; return ""; } } } }
+  byArrows=[]; let nid=0, dry=true; const own={}, rest={};
+  // Who gets a byproduct. A machine's byproduct belongs first to its own production line: it goes back to the nearest
+  // earlier step of the line it is on that needs it (the coke Athanor's charcoal goes back to the charcoal powder feeding
+  // that same Athanor; the steel Athanor's iron ingots go back into that same Athanor). It is never sent across to a
+  // different line while its own line still needs it. Only what a line cannot use itself is shared out to other lines.
+  // The tree is walked twice: once to find how much each line keeps for itself, then for real with only the leftover to share.
+  const restOf=n=>rest[n]||(rest[n]={v:Math.max(0,sol.recycled[n]-(own[n]||0))});
+  const tree=(n,q,d,parent,pn,anc)=>{ const isRoot=d===0, r=R[n], cut=!isRoot&&cs.has(n), id=++nid;
+    let by=null; if(!isRoot&&!cut&&sol.recycled[n]>1e-9&&sol.flows[n]>1e-9){
+      let src=null; for(let i=anc.length-1;i>=0;i--) if(anc[i].pools[n]>1e-9){ src=anc[i]; break; }
+      let take=0, from=null, fromId=null;
+      if(src){ take=Math.min(q,src.pools[n]); src.pools[n]-=take; from=src.item; fromId=src.id; if(dry) own[n]=(own[n]||0)+take; }
+      else if(!dry){ from=Object.keys(sol.flows).find(p=>p!==n&&R[p]&&R[p].outs[n]!=null&&I[p].kind!=="raw"); if(from){ const pool=restOf(n); take=Math.min(q,pool.v); pool.v-=take; } }
+      // the arrow always points at the thing that uses the byproduct; the item's own box shows only what still has to be made
+      if(take>1e-6&&from){ by={amt:take,from,full:take>=q-1e-6}; if(!dry) byArrows.push({from,fromId,item:n,amt:take,to:parent,self:fromId!==null&&fromId===parent}); if(by.full){ nid--; return ""; } } }
     const leaf=d>40||!r||I[n].kind==="raw"||cut||(by&&by.full), mq=by?q-by.amt:q;
-    let kids="", tail=false; if(!leaf){ const crafts=mq/(r.outs[n]*C.yieldOf(r)); const ks=Object.keys(r.ins).filter(i=>I[i]).sort((x,y)=>(G.pos[x]??0)-(G.pos[y]??0));
-      const inner=ks.map(i=>tree(i,crafts*r.ins[i],d+1,id,n)).join("");
+    let kids="", tail=false; if(!leaf){ const yl=C.yieldOf(r), crafts=mq/(r.outs[n]*yl); const ks=Object.keys(r.ins).filter(i=>I[i]).sort((x,y)=>(G.pos[x]??0)-(G.pos[y]??0));
+      // what this machine gives off besides its main item, for the earlier steps of its own line to draw on
+      const mine={item:n,id,pools:{}}; for(const o in r.outs) if(o!==n) mine.pools[o]=crafts*r.outs[o]*yl; const line=anc.concat([mine]);
+      const inner=ks.map(i=>tree(i,crafts*r.ins[i],d+1,id,n,line)).join("");
       tail=!inner&&ks.length>0;
       if(inner) kids='<div class="kids">'+inner+'</div><div class="stub" aria-hidden="true"></div><div class="tri" aria-hidden="true"></div>'; }
     return '<div class="branch'+(tail?' tail':'')+'">'+kids+nodeHtml(n,mq,isRoot,id,!!kids&&!isRoot)+'</div>'; };
   if(root!==treeRoot){ treeRoot=root; treeFresh=true; treeFocus=null; $("treetip").hidden=true; }
-  $("ingr").innerHTML='<div class="zw" style="transform:'+treeTf()+'">'+tree(root,rate,0,0)+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg></div>'; applyFocus(); layoutTree();
+  $("ingr").innerHTML='<div class="zw" style="transform:'+treeTf()+'">'+(tree(root,rate,0,0,null,[]),dry=false,nid=0,byArrows=[],tree(root,rate,0,0,null,[]))+'<svg class="bylines" aria-hidden="true"></svg><svg class="bytext" aria-hidden="true"></svg></div>'; applyFocus(); layoutTree();
 
   // --- machines ---
   $("mrows").innerHTML=sol.list.filter(m=>m.count>1e-9).sort((a,b)=>(G.pos[a.item]??999)-(G.pos[b.item]??999)).map(m=>{ const n=m.count, b=Math.ceil(n-1e-9), busy=b?n/b*100:0;

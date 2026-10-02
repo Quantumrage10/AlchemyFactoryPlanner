@@ -95,6 +95,11 @@ must(/Coke Powder/.test(strip(els.busin.innerHTML)) && !/Coke [^P]/.test(strip(e
 // steel ingot has other uses, so it still ships and gears are made on site
 must(api.status('Steel Ingot').code === 'ded' && api.status('Steel Gear').code === 'no', 'steel ingot should ship and steel gears be made on site');
 doc.getElementById('fuelsel').value = 'Coke Powder'; doc.getElementById('fuelsel').onchange();
+// a byproduct goes back to its own line: the coke Athanor's charcoal feeds its own charcoal powder, the steel Athanor's iron its own steel
+api.openMod('Coke Powder'); els.rate.value = '30'; els.rate.oninput();
+{ const t = strip(els.ingr.innerHTML); must(t.includes('Charcoal 300/min') && t.includes('Plank 300/min'), 'coke should get 60 charcoal back and make only 300: ' + t); }
+api.openMod('Steel Ingot'); els.rate.value = '60'; els.rate.oninput();
+{ const t = strip(els.ingr.innerHTML); must(t.includes('Iron Ingot 60/min'), 'steel should get 180 iron ingots back and smelt only 60: ' + t); }
 // when a bus connection runs out between two whole-machine sizes, the size table still offers the most that fits
 api.openMod('Gold Dust');
 must(/Most that fits/.test(strip(els.fit.innerHTML)) && !/Even the smallest size is too big/.test(strip(els.fit.innerHTML)), 'gold dust should be offered the most that fits its bus connections: ' + strip(els.fit.innerHTML).slice(0, 300));
