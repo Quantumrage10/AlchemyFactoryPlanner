@@ -945,17 +945,19 @@ $("ingr").addEventListener("click",e=>{ const b=e.target.closest&&e.target.close
 $("treefocusoff").onclick=()=>{ treeFocus=null; treeFresh=true; renderMod(); };
 // The tree sits in a window you can move around in, like a map. Ctrl + scroll zooms in or out on the spot under the
 // mouse, dragging slides it, and plain scrolling still scrolls the page. Opening another module starts it at full size.
-const treeTf=()=>"translate("+treeX+"px,"+treeY+"px) scale("+treeZoom+")";
+// the position is kept exact and only rounded when drawn, so zooming in many small steps does not drift off the mouse
+const treeTf=()=>"translate("+Math.round(treeX)+"px,"+Math.round(treeY)+"px) scale("+treeZoom+")";
 // The tree window works like a map. It is always the height of the browser window, whatever the zoom, so zooming never
-// changes the length of the page. It opens with the whole tree in view. While the tree fits it sits still in the
-// middle; once you zoom in past the edges you can drag it around, and it can never be dragged out of the window.
+// changes the length of the page. It opens with the whole tree in view, centred. Zooming keeps the exact spot under
+// the mouse where it is, and dragging moves the tree; part of it always stays inside the window.
 // Nothing here ever scrolls the page.
 function placeTree(reset){ const flow=$("ingr"), zw=flow.firstElementChild; if(!zw) return; const W0=zw.offsetWidth, H0=zw.offsetHeight;
   flow.style.height=Math.max(320,Math.round((window.innerHeight||800)-40))+"px";
   const cw=flow.clientWidth, ch=flow.clientHeight;
-  if(reset){ treeZoom=Math.min(1,cw/W0,ch/H0); treeX=0; treeY=0; }
-  const w=W0*treeZoom, h=H0*treeZoom, hold=(v,size,room)=>size<=room?(room-size)/2:Math.min(0,Math.max(room-size,v));
-  treeX=Math.round(hold(treeX,w,cw)); treeY=Math.round(hold(treeY,h,ch));
+  if(reset){ treeZoom=Math.min(1,cw/W0,ch/H0); treeX=(cw-W0*treeZoom)/2; treeY=(ch-H0*treeZoom)/2; }
+  // the tree goes exactly where zooming and dragging put it; the only limit is that a good piece of it stays in the window
+  const w=W0*treeZoom, h=H0*treeZoom, hold=(v,size,room)=>Math.min(room-Math.min(120,room/3),Math.max(Math.min(120,room/3)-size,v));
+  treeX=hold(treeX,w,cw); treeY=hold(treeY,h,ch);
   zw.style.transform=treeTf(); }
 // As soon as you start working with the tree (pressing on it, or zooming it) the page slides so the whole tree window is
 // on screen. Plain scrolling past it is left alone.
