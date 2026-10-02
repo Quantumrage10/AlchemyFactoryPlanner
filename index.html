@@ -790,7 +790,9 @@ function wagonOf(n){ const it=I[n]; if(it.relic) return "research"; const f=it.h
 const SHAREWHY={fuel:" Rides the fuel wagon.",fert:" Rides the fertilizer wagon."};
 // What we recommend for an item. code: ded (own wagon type), mix (a shared wagon type; wagon says which), maybe, no
 function rec(n){ const s=statusBase(n); if(s.code==="mix"&&!s.wagon) s.wagon="research";
-  if(s.code==="ded"){ const w=wagonOf(n); if(w){ s.code="mix"; s.wagon=w; s.why+=SHAREWHY[w]||""; } }
+  // something picked as both the fuel and the fertilizer is recommended onto both wagons
+  if(s.code==="ded"&&n===C.fuel()&&n===C.fert()&&tagById("fuel")&&tagById("fert")){ s.code="mix"; s.wagon="fuel"; s.wagons=["fuel","fert"]; s.why+=" Rides the fuel and fertilizer wagons."; }
+  else if(s.code==="ded"){ const w=wagonOf(n); if(w){ s.code="mix"; s.wagon=w; s.why+=SHAREWHY[w]||""; } }
   if(s.code==="mix"&&!tagById(s.wagon)){ s.code="ded"; delete s.wagon; } return s; }
 // Where an item stands: what you set, or else the recommendation (or nothing, once recommendations are cleared)
 function status(n){ const p=plan.place[n], L=line(), it=I[n];

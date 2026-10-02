@@ -139,6 +139,10 @@ api.setPlace('Glass', 'tag:' + tid);
 must(api.status('Glass').code === 'mix' && /Yes · saturn parts wagon/.test(strip(els.rows.innerHTML)), 'an item should be addable to a shared wagon you made');
 api.openMod('Saturn');
 must(/Glass/.test(strip(els.busin.innerHTML)) && !/Brick/.test(strip(els.busin.innerHTML)), 'modules should follow the plan: ' + strip(els.busin.innerHTML));
+// picked as both the fuel and the fertilizer, an item is recommended onto both wagons
+doc.getElementById('fuelsel').value = 'Panacea Potion'; doc.getElementById('fertsel').value = 'Panacea Potion'; doc.getElementById('fuelsel').onchange();
+must(where('Panacea Potion') === 'tag:fuel,fert', 'panacea picked as fuel and fertilizer should ride both wagons: ' + where('Panacea Potion'));
+doc.getElementById('fuelsel').value = 'Coke Powder'; doc.getElementById('fertsel').value = 'Advanced Fertilizer'; doc.getElementById('fuelsel').onchange();
 // one item on several shared wagons at once
 api.setPlace('Panacea Potion', 'tag:fuel,fert,research');
 must(where('Panacea Potion') === 'tag:research,fuel,fert' && /Yes · sell \/ research \+ fuel \+ fertilizer wagons/.test(strip(els.rows.innerHTML)), 'an item should be able to ride several shared wagons: ' + where('Panacea Potion'));
