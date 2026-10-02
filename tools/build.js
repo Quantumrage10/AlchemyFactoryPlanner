@@ -126,7 +126,7 @@ must(+els.rate.value > 0 && /of 8/.test(strip(els.conn.innerHTML)) && !/(9|1\d) 
 const where = n => api.valueOf(api.status(n));
 must(where('Coke Powder') === 'tag:fuel' && where('Advanced Fertilizer') === 'tag:fert' && where('Jupiter') === 'tag:research', 'fuel, fertilizer and relics should start on their shared wagons');
 must(where('Panacea Potion') === 'off', 'panacea burns and feeds nurseries, so it should not default to the shop wagon');
-must(where('Pocket Watch') === 'tag:shop' && where('Brick') === 'own' && where('Glass') === 'own', 'only sell-only items start on the shop wagon; brick and glass keep their own wagons');
+must(where('Pocket Watch') === 'tag:research' && where('Brick') === 'own' && where('Glass') === 'own', 'only sell-only items start on the shop wagon; brick and glass keep their own wagons');
 must(/Yes · fuel wagon/.test(strip(els.rows.innerHTML)), 'the label should name the shared wagon');
 must(/Wagon types on your bus: \d+/.test(els.wcount.textContent), 'the wagon type count is missing');
 // anything can be put anywhere, and every module follows

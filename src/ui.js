@@ -42,12 +42,15 @@ const inTier=n=>I[n]&&I[n].tier<=tierMax();
 // ---------- your plan: where every item goes, and the shared wagon types (kept in this browser only) ----------
 // What we recommend is only the starting layout. plan.place holds what you have changed (item -> "off", "maybe",
 // "own" or "tag:<id>"), plan.tags the shared wagon types, and plan.cleared means nothing is recommended at all.
-const DEFAULT_TAGS=()=>[{id:"research",name:"research"},{id:"fuel",name:"fuel"},{id:"fert",name:"fertilizer"},{id:"shop",name:"shop"}];
-const TAGNOTE={research:"Relics. Research and the shop take any of them.",fuel:"Anything that burns.",fert:"Anything that feeds a nursery.",
-  shop:"Things that are only sold. Unload it all at the shop and send what's left to knowledge altars."};
+// One wagon for everything that ends at the shop: it is sold first, and whatever does not sell goes on to research.
+const DEFAULT_TAGS=()=>[{id:"research",name:"sell / research"},{id:"fuel",name:"fuel"},{id:"fert",name:"fertilizer"}];
+const TAGNOTE={research:"Relics, and things that are only sold. Sell them first; whatever doesn't sell goes to research.",fuel:"Anything that burns.",fert:"Anything that feeds a nursery."};
 let plan={place:{},tags:DEFAULT_TAGS(),cleared:false};
 try{ const sv=JSON.parse(localStorage.getItem("bsp_plan_v1")||"null");
-  if(sv&&typeof sv==="object"){ if(sv.place&&typeof sv.place==="object") plan.place=sv.place; if(Array.isArray(sv.tags)) plan.tags=sv.tags.filter(t=>t&&t.id&&t.name); plan.cleared=!!sv.cleared; }
+  if(sv&&typeof sv==="object"){ if(sv.place&&typeof sv.place==="object") plan.place=sv.place; if(Array.isArray(sv.tags)) plan.tags=sv.tags.filter(t=>t&&t.id&&t.name); plan.cleared=!!sv.cleared;
+    // plans saved before the shop and research wagons became one: fold the old shop wagon into it
+    for(const k in plan.place) if(plan.place[k]==="tag:shop") plan.place[k]="tag:research";
+    plan.tags=plan.tags.filter(t=>t.id!=="shop"); for(const t of plan.tags) if(t.id==="research"&&t.name==="research") t.name="sell / research"; }
   else { const old=JSON.parse(localStorage.getItem("bsp_choice")||"{}")||{}; for(const k in old) plan.place[k]=old[k]==="bus"?"own":"off"; } }catch(e){}
 const savePlan=()=>{ try{ localStorage.setItem("bsp_plan_v1",JSON.stringify(plan)); }catch(e){} };
 const tagById=id=>plan.tags.find(t=>t.id===id);
@@ -92,10 +95,10 @@ function statusBase(n){
   const usesTxt=listAnd(users.slice(0,4))+(users.length>4?" and others":"");
   if(C.UNIVERSAL.includes(n)){ const isFuel=n===C.fuel(), isFert=n===C.fert();
     return {code:"ded",why:"Always on the bus: it's "+(isFuel&&isFert?"the fuel and the fertilizer":isFuel?"the fuel":"the fertilizer")+" you've picked."+(users.length?" Also an ingredient for "+usesTxt+".":"")}; }
-  if(it.relic) return {code:"mix",why:"A relic. Rides the research wagon."+(users.length?" Also an ingredient for "+usesTxt+".":"")};
+  if(it.relic) return {code:"mix",why:"A relic. Rides the sell / research wagon."+(users.length?" Also an ingredient for "+usesTxt+".":"")};
   if(L.bus.has(n)){ const fb=L.forcedBy[n]||[]; return {code:"ded",why:"The "+listAnd(fb.slice(0,3))+" module"+(fb.length>1?"s":"")+" can't fit making "+(fb.length>1?"their":"its")+" own "+n.toLowerCase()+"."}; }
   if(made&&!it.uses.length&&wagonOf(n)) return {code:"no",why:(it.heat>0&&it.nutr>0?"A fuel and a fertilizer":it.heat>0?"A fuel":"A fertilizer")+" that nothing uses as an ingredient. Off the bus unless you pick it in setup or place it yourself."};
-  if(made&&it.sell&&!it.uses.length) return {code:"mix",wagon:"shop",why:"Only sold. Rides the shop wagon."};
+  if(made&&it.sell&&!it.uses.length) return {code:"mix",wagon:"research",why:"Only sold. Rides the sell / research wagon."};
   if(it.liq) return {code:"no",why:"A liquid. Piped where it's used."};
   if(it.kind==="raw") return {code:"no",why:"Bought with coins where it's used."};
   if(it.kind==="crop") return {code:"no",why:"Grown where it's used."};
