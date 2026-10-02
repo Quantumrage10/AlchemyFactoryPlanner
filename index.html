@@ -1222,8 +1222,9 @@ function renderMod(){
   }}
   $("notes").innerHTML=notes.length?`<div class="box"><h3>Byproducts: the only things that can stall this module</h3><ul class="notes">${notes.join("")}</ul><p class="fitsub">Everything else is safe to over-build.</p></div>`:"";
 }
-// stepping down from exactly 1 lands on 0.99, not 0 (typing a 0 yourself is left alone)
-$("rate").oninput=e=>{ if(lastRate===1&&+$("rate").value===0&&$("rate").value!==""&&!(e&&e.inputType)) $("rate").value=0.99; renderMod(); };
+// stepping down from exactly 1 lands on 0.99, not 0 (typing a 0 yourself is left alone). The arrows report themselves
+// differently in different browsers: no input type in Chrome, "insertReplacementText" in Firefox.
+$("rate").oninput=e=>{ if(lastRate===1&&+$("rate").value===0&&$("rate").value!==""&&(!e||!e.inputType||e.inputType==="insertReplacementText")) $("rate").value=0.99; renderMod(); };
 $("fit").addEventListener("click",e=>{ const x=e.target.closest("[data-rate]"); if(x){ $("rate").value=+(+x.dataset.rate).toPrecision(6); renderMod(); } });
 $("ingr").addEventListener("click",e=>{ const b=e.target.closest(".swap"); if(b) decide(b.dataset.item,b.dataset.to||null); });
 
